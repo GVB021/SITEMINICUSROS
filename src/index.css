@@ -133,9 +133,13 @@
 
 /* Smooth theme transitions */
 body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  transition: background-color var(--transition-base), color var(--transition-base);
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #18181b);
+  transition: background-color var(--transition-base, 300ms cubic-bezier(0.4, 0, 0.2, 1)), color var(--transition-base, 300ms cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+html {
+  color-scheme: light dark;
 }
 
 @layer utilities {
