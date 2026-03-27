@@ -132,14 +132,32 @@
 }
 
 /* Smooth theme transitions */
-body {
-  background-color: var(--bg-primary, #ffffff);
-  color: var(--text-primary, #18181b);
-  transition: background-color var(--transition-base, 300ms cubic-bezier(0.4, 0, 0.2, 1)), color var(--transition-base, 300ms cubic-bezier(0.4, 0, 0.2, 1));
-}
-
 html {
   color-scheme: light dark;
+}
+
+body {
+  background-color: #ffffff;
+  color: #18181b;
+  transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Apply CSS variables after initial load */
+:root body {
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #18181b);
+}
+
+[data-theme="dark"] body {
+  background-color: var(--bg-primary, #09090b);
+  color: var(--text-primary, #fafafa);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body {
+    background-color: var(--bg-primary, #09090b);
+    color: var(--text-primary, #fafafa);
+  }
 }
 
 @layer utilities {
