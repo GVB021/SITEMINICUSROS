@@ -15,6 +15,7 @@ export default defineConfig(({mode}) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+      dedupe: ['react', 'react-dom'],
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
@@ -31,7 +32,18 @@ export default defineConfig(({mode}) => {
             'data-vendor': ['zustand', 'localforage'],
           },
         },
+        onwarn(warning, warn) {
+          if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return;
+          warn(warning);
+        },
       },
+      commonjsOptions: {
+        transformMixedEsModules: true,
+      },
+    },
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react-router-dom', 'lucide-react', 'motion'],
+      exclude: [],
     },
   };
 });
