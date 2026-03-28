@@ -2,15 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/auth-fetch";
 import { useAuth } from "@/hooks/use-auth";
 
-export type StudioRole = "platform_owner" | "studio_admin" | "diretor" | "engenheiro_audio" | "dublador" | "aluno" | null;
+export type StudioRole = "MASTER" | "ADMINISTRADOR" | "DIRETOR" | "DUBLADOR" | "ALUNO" | null;
 
 const ROLE_HIERARCHY: Record<string, number> = {
-  platform_owner: 100,
-  studio_admin: 80,
-  diretor: 60,
-  engenheiro_audio: 40,
-  dublador: 20,
-  aluno: 10,
+  MASTER: 100,
+  ADMINISTRADOR: 80,
+  DIRETOR: 60,
+  DUBLADOR: 40,
+  ALUNO: 20,
 };
 
 export function useStudioRole(studioId: string) {
@@ -23,12 +22,12 @@ export function useStudioRole(studioId: string) {
     staleTime: 60000,
   });
 
-  const roles: string[] = user?.role === "platform_owner"
-    ? ["platform_owner"]
+  const roles: string[] = user?.role === "MASTER"
+    ? ["MASTER"]
     : (data?.roles?.length ? data.roles : (data?.role ? [data.role] : []));
 
-  const role: StudioRole = user?.role === "platform_owner"
-    ? "platform_owner"
+  const role: StudioRole = user?.role === "MASTER"
+    ? "MASTER"
     : (data?.role as StudioRole) || null;
 
   const hasMinRole = (minRole: string): boolean => {
@@ -43,13 +42,13 @@ export function useStudioRole(studioId: string) {
   return {
     role,
     roles,
-    isLoading: isLoading && user?.role !== "platform_owner",
-    canManageMembers: hasMinRole("studio_admin"),
-    canCreateProductions: hasMinRole("studio_admin"),
-    canCreateSessions: hasMinRole("diretor"),
-    canEditScripts: hasMinRole("studio_admin"),
-    canManageStaff: hasMinRole("studio_admin"),
-    canViewStaff: hasMinRole("engenheiro_audio"),
+    isLoading: isLoading && user?.role !== "MASTER",
+    canManageMembers: hasMinRole("ADMINISTRADOR"),
+    canCreateProductions: hasMinRole("ADMINISTRADOR"),
+    canCreateSessions: hasMinRole("DIRETOR"),
+    canEditScripts: hasMinRole("ADMINISTRADOR"),
+    canManageStaff: hasMinRole("ADMINISTRADOR"),
+    canViewStaff: hasMinRole("DIRETOR"),
     hasMinRole,
     hasRole,
   };

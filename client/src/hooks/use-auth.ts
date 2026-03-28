@@ -2,37 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import type { User } from "@shared/models/auth";
 
-const AUTH_CACHE_KEY = "thehub_auth_user_v1";
-
-function readCachedUser(): User | null {
-  try {
-    const raw = localStorage.getItem(AUTH_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as User;
-    if (!parsed || typeof (parsed as any).id !== "string") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedUser(user: User | null) {
-  try {
-    if (!user) {
-      localStorage.removeItem(AUTH_CACHE_KEY);
-      return;
-    }
-    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(user));
-  } catch {}
-}
-
 async function fetchUser(): Promise<User | null> {
   const response = await fetch("/api/auth/user", {
     credentials: "include",
   });
 
   if (response.status === 401 || response.status === 403) {
-    writeCachedUser(null);
     return null;
   }
 
@@ -41,7 +16,6 @@ async function fetchUser(): Promise<User | null> {
   }
 
   const data = await response.json();
-  writeCachedUser(data);
   return data;
 }
 
@@ -54,11 +28,11 @@ export function useAuth() {
     queryFn: fetchUser,
     retry: false,
     staleTime: 1000 * 60 * 5,
-    initialData: readCachedUser,
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
+      console.log("[Auth] Attempting login for:", credentials.email);
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,15 +41,15 @@ export function useAuth() {
       });
       const data = await res.json();
       if (!res.ok) {
+        console.error("[Auth] Login failed:", data.message);
         const err = new Error(data.message || "Erro ao fazer login");
         (err as any).status = res.status;
         throw err;
       }
+      console.log("[Auth] Login success");
       return data;
     },
-    onSuccess: (data: any) => {
-      const nextUser: User | null = data?.user || null;
-      if (nextUser) writeCachedUser(nextUser);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
   });
@@ -104,10 +78,9 @@ export function useAuth() {
       });
     },
     onSuccess: () => {
-      writeCachedUser(null);
       queryClient.setQueryData(["/api/auth/user"], null);
       queryClient.clear();
-      navigate("/hub-dub/login", { replace: true });
+      navigate("/login", { replace: true });
     },
   });
 
