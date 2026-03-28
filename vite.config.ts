@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
+// Build config v2 - force fresh build
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
