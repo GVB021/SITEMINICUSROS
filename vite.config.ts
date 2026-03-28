@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
-// Build config v2 - optimized for Railway
+// Build config v3 - Railway deploy
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
