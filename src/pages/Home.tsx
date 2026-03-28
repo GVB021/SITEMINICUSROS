@@ -1,221 +1,195 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Play, Star, BookOpen, Users, Mic2 } from 'lucide-react';
-import { courses } from '../data/courses';
-import { useHeroStore } from '../store/heroStore';
+import { useCourseStore } from '../store/courseStore';
+import { useSettingsStore } from '../store/settingsStore';
 
 export default function Home() {
-  const { hero, loadHero, isLoading } = useHeroStore();
-  const featuredCourse = courses.find(c => c.id === 'plano-de-carreira');
-  const recentCourses = courses.filter(c => c.id !== 'plano-de-carreira').slice(0, 3);
-
-  useEffect(() => {
-    loadHero();
-  }, [loadHero]);
-
-  if (isLoading) {
-    return <div className="min-h-screen bg-indigo-950" />;
-  }
+  const courses = useCourseStore(state => state.courses);
+  const settings = useSettingsStore(state => state.settings);
+  
+  const featuredCourse = courses.find(c => c.id === settings.featuredCourseId) || courses[0];
+  const recentCourses = courses.filter(c => c.id !== featuredCourse?.id).slice(0, 3);
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
-      <section className="relative text-white overflow-hidden" style={{ background: 'var(--gradient-hero)' }}>
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
+      <section className="relative bg-indigo-950 text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
           <img
-            src={hero.backgroundImage}
+            src={settings.heroImageUrl}
             className="w-full h-full object-cover"
-            alt="Banner"
+            alt="Estúdio de Gravação"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-28 lg:py-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-24 lg:py-32">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
-            className="max-w-4xl"
+            transition={{ duration: 0.6 }}
+            className="max-w-3xl"
           >
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-tight">
-              {hero.title}<span className="bg-gradient-to-r from-purple-400 to-purple-200 bg-clip-text text-transparent">{hero.titleHighlight}</span>.
-            </h1>
-            <p className="text-xl md:text-2xl text-purple-100 mb-12 leading-relaxed font-light">
-              {hero.subtitle}
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6" dangerouslySetInnerHTML={{ __html: settings.heroTitle }} />
+            <p className="text-xl text-indigo-100 mb-10 leading-relaxed">
+              {settings.heroSubtitle}
             </p>
+            <div className="flex flex-wrap gap-4">
+              <Link
+                to="/explore"
+                className="bg-indigo-500 hover:bg-indigo-400 text-white px-8 py-4 rounded-full font-bold text-lg transition-all shadow-lg hover:shadow-indigo-500/30 flex items-center gap-2"
+              >
+                <Play className="w-5 h-5 fill-current" />
+                Começar Agora
+              </Link>
+              <Link
+                to="/course/plano-de-carreira"
+                className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white border border-white/20 px-8 py-4 rounded-full font-bold text-lg transition-all flex items-center gap-2"
+              >
+                <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                Plano de Carreira
+              </Link>
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* Stats Section */}
-      <section className="py-16" style={{ background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-primary)' }}>
+      <section className="bg-white py-12 border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            {[
-              { value: '+100', label: 'Minicursos' },
-              { value: '100%', label: 'Gratuito' },
-              { value: '24/7', label: 'Acesso Livre' },
-              { value: '3', label: 'Áreas de Foco' }
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="text-center p-6 rounded-2xl transition-all duration-500 hover:scale-105"
-                style={{ background: 'var(--bg-elevated)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-primary)' }}
-              >
-                <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent mb-3">
-                  {stat.value}
-                </div>
-                <div className="text-xs md:text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
-                  {stat.label}
-                </div>
-              </motion.div>
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-3xl font-bold text-indigo-600 mb-2">+100</div>
+              <div className="text-sm text-zinc-500 font-medium uppercase tracking-wider">Minicursos</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-indigo-600 mb-2">100%</div>
+              <div className="text-sm text-zinc-500 font-medium uppercase tracking-wider">Gratuito</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-indigo-600 mb-2">24/7</div>
+              <div className="text-sm text-zinc-500 font-medium uppercase tracking-wider">Acesso Livre</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-indigo-600 mb-2">3</div>
+              <div className="text-sm text-zinc-500 font-medium uppercase tracking-wider">Áreas de Foco</div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Featured Career Plan */}
       {featuredCourse && (
-        <section className="py-24" style={{ background: 'var(--bg-secondary)' }}>
+        <section className="py-20 bg-zinc-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col lg:flex-row gap-16 items-center">
+            <div className="flex flex-col lg:flex-row gap-12 items-center">
               <div className="lg:w-1/2">
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6 }}
-                >
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 text-sm font-bold mb-8 shadow-lg">
-                    <Star className="w-4 h-4 fill-current" />
-                    Módulo em Destaque
-                  </div>
-                  <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight" style={{ color: 'var(--text-primary)' }}>
-                    {featuredCourse.title}
-                  </h2>
-                  <p className="text-lg md:text-xl mb-10 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    {featuredCourse.description}
-                  </p>
-                </motion.div>
-                <ul className="space-y-5 mb-10">
-                  {[
-                    { icon: Mic2, text: 'Aprenda a montar seu Voice Reel profissional.' },
-                    { icon: Users, text: 'Comportamento e ética dentro do estúdio.' },
-                    { icon: BookOpen, text: 'Lista exclusiva de contatos de estúdios para cadastro.', bold: true }
-                  ].map((item, index) => (
-                    <motion.li
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
-                      className="flex items-start gap-4"
-                    >
-                      <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-xl text-purple-600 dark:text-purple-400 mt-0.5 shadow-sm">
-                        <item.icon className="w-5 h-5" />
-                      </div>
-                      <span className={`text-base leading-relaxed ${item.bold ? 'font-semibold' : ''}`} style={{ color: 'var(--text-secondary)' }}>
-                        {item.text}
-                      </span>
-                    </motion.li>
-                  ))}
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-bold mb-6">
+                  <Star className="w-4 h-4 fill-current" />
+                  {settings.featuredTitle}
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold text-zinc-900 mb-6">
+                  {featuredCourse.title}
+                </h2>
+                <p className="text-lg text-zinc-600 mb-8 leading-relaxed">
+                  {featuredCourse.description}
+                </p>
+                <ul className="space-y-4 mb-8">
+                  <li className="flex items-start gap-3">
+                    <div className="bg-indigo-100 p-1 rounded-full text-indigo-600 mt-1">
+                      <Mic2 className="w-4 h-4" />
+                    </div>
+                    <span className="text-zinc-700">Aprenda a montar seu Voice Reel profissional.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="bg-indigo-100 p-1 rounded-full text-indigo-600 mt-1">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span className="text-zinc-700">Comportamento e ética dentro do estúdio.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="bg-indigo-100 p-1 rounded-full text-indigo-600 mt-1">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <span className="text-zinc-700 font-semibold">Lista exclusiva de contatos de estúdios para cadastro.</span>
+                  </li>
                 </ul>
                 <Link
                   to={`/course/${featuredCourse.id}`}
-                  className="premium-button inline-flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-base text-white"
+                  className="inline-flex items-center justify-center bg-zinc-900 text-white px-6 py-3 rounded-lg font-medium hover:bg-zinc-800 transition-colors"
                 >
                   Acessar Plano de Carreira
                 </Link>
               </div>
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="lg:w-1/2 w-full"
-              >
-                <div className="relative rounded-3xl overflow-hidden aspect-video group" style={{ boxShadow: 'var(--shadow-2xl)' }}>
+              <div className="lg:w-1/2 w-full">
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl aspect-video">
                   <img
                     src={featuredCourse.imageUrl}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="w-full h-full object-cover"
                     alt="Plano de Carreira"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end p-8 pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-8 pointer-events-none">
                     <div className="text-white">
-                      <div className="font-bold text-2xl mb-2">O Guia Definitivo</div>
-                      <div className="text-white/90 text-base">Prepare-se para o mercado de trabalho</div>
+                      <div className="font-bold text-xl mb-2">{settings.featuredTitle}</div>
+                      <div className="text-white/80 text-sm">{settings.featuredSubtitle}</div>
                     </div>
                   </div>
-                  <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-3xl pointer-events-none"></div>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
       )}
 
       {/* Recent Courses */}
-      <section className="py-24" style={{ background: 'var(--bg-primary)' }}>
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-end mb-16">
+          <div className="flex justify-between items-end mb-12">
             <div>
-              <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Adicionados Recentemente</h2>
-              <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>Explore os últimos minicursos de dublagem e fonoaudiologia.</p>
+              <h2 className="text-3xl font-bold text-zinc-900 mb-4">Adicionados Recentemente</h2>
+              <p className="text-zinc-600">Explore os últimos minicursos de dublagem e fonoaudiologia.</p>
             </div>
-            <Link to="/explore" className="hidden md:inline-flex items-center gap-2 text-purple-600 dark:text-purple-400 font-semibold hover:gap-3 transition-all duration-300">
-              Ver todos os cursos
-              <span className="text-xl">&rarr;</span>
+            <Link to="/explore" className="hidden md:inline-flex text-indigo-600 font-medium hover:text-indigo-700">
+              Ver todos os cursos &rarr;
             </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {recentCourses.map((course, index) => (
-              <motion.div
-                key={course.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <Link to={`/course/${course.id}`} className="premium-card group flex flex-col rounded-2xl overflow-hidden">
-                  <div className="aspect-video relative overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
-                    <img
-                      src={course.imageUrl}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      alt={course.title}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                    <div className="absolute top-4 left-4 pointer-events-none">
-                      <span className="glass-morphism text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg" style={{ color: 'var(--text-primary)' }}>
-                        {course.category}
-                      </span>
-                    </div>
+            {recentCourses.map((course) => (
+              <Link key={course.id} to={`/course/${course.id}`} className="group flex flex-col bg-white rounded-2xl border border-zinc-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                <div className="aspect-video relative overflow-hidden bg-zinc-100">
+                  <img
+                    src={course.imageUrl}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    alt={course.title}
+                  />
+                  <div className="absolute top-4 left-4 pointer-events-none">
+                    <span className="bg-white/90 backdrop-blur-sm text-zinc-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                      {course.category}
+                    </span>
                   </div>
-                  <div className="p-7 flex flex-col flex-grow">
-                    <h3 className="text-xl font-bold mb-3 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-300 line-clamp-2" style={{ color: 'var(--text-primary)' }}>
-                      {course.title}
-                    </h3>
-                    <p className="text-sm mb-6 line-clamp-3 flex-grow leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      {course.description}
-                    </p>
-                    <div className="flex items-center justify-between text-sm mt-auto pt-5" style={{ borderTop: '1px solid var(--border-primary)' }}>
-                      <span className="flex items-center gap-2" style={{ color: 'var(--text-tertiary)' }}>
-                        <BookOpen className="w-4 h-4" />
-                        {course.lessons.length} aulas
-                      </span>
-                      <span className="font-semibold text-purple-600 dark:text-purple-400 group-hover:gap-2 inline-flex items-center gap-1 transition-all duration-300">
-                        Acessar <span className="text-lg">&rarr;</span>
-                      </span>
-                    </div>
+                </div>
+                <div className="p-6 flex flex-col flex-grow">
+                  <h3 className="text-xl font-bold text-zinc-900 mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                    {course.title}
+                  </h3>
+                  <p className="text-zinc-600 text-sm mb-6 line-clamp-3 flex-grow">
+                    {course.description}
+                  </p>
+                  <div className="flex items-center justify-between text-sm text-zinc-500 mt-auto pt-4 border-t border-zinc-100">
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="w-4 h-4" />
+                      {course.lessons.length} aulas
+                    </span>
+                    <span className="font-medium text-indigo-600">Acessar &rarr;</span>
                   </div>
-                </Link>
-              </motion.div>
+                </div>
+              </Link>
             ))}
           </div>
           
-          <div className="mt-12 text-center md:hidden">
-            <Link to="/explore" className="inline-flex items-center gap-2 text-purple-600 dark:text-purple-400 font-semibold hover:gap-3 transition-all duration-300">
-              Ver todos os cursos
-              <span className="text-xl">&rarr;</span>
+          <div className="mt-10 text-center md:hidden">
+            <Link to="/explore" className="inline-flex text-indigo-600 font-medium hover:text-indigo-700">
+              Ver todos os cursos &rarr;
             </Link>
           </div>
         </div>

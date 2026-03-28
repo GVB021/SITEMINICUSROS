@@ -219,7 +219,7 @@ export default function LessonView() {
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors shadow-sm"
             >
               <CheckCircle2 className="w-5 h-5" />
-              Fim do MiniCurso
+              Finalizar Curso
             </Link>
           )}
         </div>

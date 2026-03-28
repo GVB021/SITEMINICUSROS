@@ -12,13 +12,16 @@ import CourseView from './pages/CourseView';
 import LessonView from './pages/LessonView';
 import AdminPanel from './pages/AdminPanel';
 import { useCourseStore } from './store/courseStore';
+import { useSettingsStore } from './store/settingsStore';
 
 export default function App() {
   const loadCourses = useCourseStore(state => state.loadCourses);
+  const loadSettings = useSettingsStore(state => state.loadSettings);
 
   useEffect(() => {
     loadCourses();
-  }, [loadCourses]);
+    loadSettings();
+  }, [loadCourses, loadSettings]);
 
   return (
     <Router>

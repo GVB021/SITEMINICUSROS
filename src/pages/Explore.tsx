@@ -21,36 +21,31 @@ export default function Explore() {
   const categories = ['All', 'Dublagem', 'Fonoaudiologia', 'Carreira'];
 
   return (
-    <div className="min-h-screen py-16" style={{ background: 'var(--bg-primary)' }}>
+    <div className="min-h-screen bg-zinc-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
-        <div className="mb-16 text-center max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-6xl font-extrabold mb-6 bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">Explorar Minicursos</h1>
-          <p className="text-lg md:text-xl leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        <div className="mb-12 text-center max-w-3xl mx-auto">
+          <h1 className="text-4xl font-extrabold text-zinc-900 mb-4">Explorar Minicursos</h1>
+          <p className="text-lg text-zinc-600">
             Acesse milhares de materiais de apoio gratuitos para aprimorar sua técnica vocal e impulsionar sua carreira na dublagem.
           </p>
         </div>
 
         {/* Filters and Search */}
-        <div className="glass-morphism p-5 rounded-2xl mb-12 flex flex-col md:flex-row gap-4 items-center justify-between sticky top-20 z-40 transition-all duration-300" style={{ boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-primary)' }}>
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-zinc-200 mb-10 flex flex-col md:flex-row gap-4 items-center justify-between sticky top-20 z-40">
           
           <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 hide-scrollbar">
-            <Filter className="w-5 h-5 mr-2 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+            <Filter className="w-5 h-5 text-zinc-400 mr-2 shrink-0" />
             {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setSearchParams(cat === 'All' ? {} : { category: cat.toLowerCase() })}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-300 ${
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                   (categoryFilter.toLowerCase() === cat.toLowerCase()) || (categoryFilter === 'All' && cat === 'All')
-                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-md scale-105'
-                    : 'hover:scale-105'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
-                style={{
-                  background: (categoryFilter.toLowerCase() === cat.toLowerCase()) || (categoryFilter === 'All' && cat === 'All') ? undefined : 'var(--bg-elevated)',
-                  color: (categoryFilter.toLowerCase() === cat.toLowerCase()) || (categoryFilter === 'All' && cat === 'All') ? undefined : 'var(--text-secondary)',
-                  border: '1px solid var(--border-primary)'
-                }}
               >
                 {cat === 'All' ? 'Todos' : cat}
               </button>
@@ -58,80 +53,68 @@ export default function Explore() {
           </div>
 
           <div className="relative w-full md:w-96">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-zinc-400" />
             </div>
             <input
               type="text"
               placeholder="Buscar cursos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-12 pr-4 py-3 rounded-xl leading-5 sm:text-sm transition-all duration-300 focus:scale-[1.02]"
-              style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-primary)',
-                color: 'var(--text-primary)',
-                boxShadow: 'var(--shadow-sm)'
-              }}
-              onFocus={(e) => e.target.style.boxShadow = 'var(--shadow-md)'}
-              onBlur={(e) => e.target.style.boxShadow = 'var(--shadow-sm)'}
+              className="block w-full pl-10 pr-3 py-2 border border-zinc-300 rounded-xl leading-5 bg-white placeholder-zinc-500 focus:outline-none focus:placeholder-zinc-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-shadow"
             />
           </div>
         </div>
 
         {/* Results */}
-        <div className="mb-8 text-sm font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+        <div className="mb-6 text-zinc-500 font-medium">
           Mostrando {filteredCourses.length} {filteredCourses.length === 1 ? 'curso' : 'cursos'}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-7">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredCourses.map((course, index) => (
             <motion.div
               key={course.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: index * 0.05, ease: [0.23, 1, 0.32, 1] }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
             >
               <Link 
                 to={`/course/${course.id}`} 
-                className={`premium-card group flex flex-col h-full rounded-2xl overflow-hidden ${
-                  course.id === 'plano-de-carreira' ? 'ring-2 ring-amber-400' : ''
+                className={`group flex flex-col h-full bg-white rounded-2xl border overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${
+                  course.id === 'plano-de-carreira' ? 'border-yellow-400 ring-1 ring-yellow-400 shadow-md' : 'border-zinc-200'
                 }`}
-                style={{
-                  boxShadow: course.id === 'plano-de-carreira' ? 'var(--shadow-premium)' : undefined
-                }}
               >
-                <div className="aspect-video relative overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
+                <div className="aspect-video relative overflow-hidden bg-zinc-100">
                   <img
                     src={course.imageUrl}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     alt={course.title}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="absolute top-3 left-3 flex gap-2 pointer-events-none">
-                    <span className="glass-morphism text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-md" style={{ color: 'var(--text-primary)' }}>
+                    <span className="bg-white/90 backdrop-blur-sm text-zinc-900 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
                       {course.category}
                     </span>
                     {course.id === 'plano-de-carreira' && (
-                       <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-md">
+                       <span className="bg-yellow-400 text-yellow-950 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                          Destaque
                        </span>
                     )}
                   </div>
                 </div>
-                <div className="p-6 flex flex-col flex-grow">
-                  <h3 className="text-lg font-bold mb-2 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-300 line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+                <div className="p-5 flex flex-col flex-grow">
+                  <h3 className="text-lg font-bold text-zinc-900 mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
                     {course.title}
                   </h3>
-                  <p className="text-sm mb-4 line-clamp-2 flex-grow leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="text-zinc-600 text-sm mb-4 line-clamp-2 flex-grow">
                     {course.description}
                   </p>
-                  <div className="flex items-center justify-between text-xs mt-auto pt-4" style={{ borderTop: '1px solid var(--border-primary)' }}>
-                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-tertiary)' }}>
+                  <div className="flex items-center justify-between text-xs text-zinc-500 mt-auto pt-4 border-t border-zinc-100">
+                    <span className="flex items-center gap-1">
                       <BookOpen className="w-3.5 h-3.5" />
                       {course.lessons.length} aulas
                     </span>
-                    <span className="px-3 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                    <span className="bg-zinc-100 px-2 py-1 rounded text-zinc-600 font-medium">
                       {course.level}
                     </span>
                   </div>
@@ -142,23 +125,19 @@ export default function Explore() {
         </div>
 
         {filteredCourses.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center py-24"
-          >
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 shadow-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-primary)' }}>
-              <Search className="w-10 h-10" style={{ color: 'var(--text-tertiary)' }} />
+          <div className="text-center py-20">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-zinc-100 mb-4">
+              <Search className="w-8 h-8 text-zinc-400" />
             </div>
-            <h3 className="text-2xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Nenhum curso encontrado</h3>
-            <p className="text-lg mb-8" style={{ color: 'var(--text-secondary)' }}>Tente ajustar seus filtros ou termo de busca.</p>
+            <h3 className="text-xl font-bold text-zinc-900 mb-2">Nenhum curso encontrado</h3>
+            <p className="text-zinc-500">Tente ajustar seus filtros ou termo de busca.</p>
             <button 
               onClick={() => { setSearchParams({}); setSearchQuery(''); }}
-              className="premium-button px-6 py-3 rounded-xl font-semibold text-white"
+              className="mt-6 text-indigo-600 font-medium hover:text-indigo-700"
             >
               Limpar todos os filtros
             </button>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

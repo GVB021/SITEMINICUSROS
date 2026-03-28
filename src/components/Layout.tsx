@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Mic2, BookOpen, Briefcase, Menu, X } from 'lucide-react';
+import { BookOpen, Briefcase, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -88,7 +88,6 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Mic2 className="h-6 w-6 text-indigo-400" />
                 <span className="font-bold text-xl text-white">Voz & Carreira</span>
               </div>
               <p className="text-sm">

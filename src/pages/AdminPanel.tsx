@@ -1,24 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useCourseStore } from '../store/courseStore';
-import { useHeroStore } from '../store/heroStore';
-import { uploadImage, compressImage } from '../services/imageUpload';
-import { Course, Lesson } from '../data/courses';
-import { Plus, Trash2, Image as ImageIcon, Save, X, Settings, Home, Loader2 } from 'lucide-react';
+import { useSettingsStore, AppSettings } from '../store/settingsStore';
+import { Course, Lesson, MediaType } from '../data/courses';
+import { Plus, Trash2, Image as ImageIcon, Save, X, LayoutTemplate, BookOpen } from 'lucide-react';
+
+// Utility function to compress images before saving to localforage
+const compressImage = (file: File, maxWidth: number = 1200): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        ctx?.drawImage(img, 0, 0, width, height);
+        // Compress to JPEG with 0.7 quality to save space
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(compressedBase64);
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const { courses, addCourse, updateCourse, deleteCourse } = useCourseStore();
-  const { hero, loadHero, updateHero } = useHeroStore();
+  const [activeTab, setActiveTab] = useState<'courses' | 'settings'>('courses');
   
-  const [activeTab, setActiveTab] = useState<'courses' | 'hero'>('courses');
+  const { courses, addCourse, updateCourse, deleteCourse } = useCourseStore();
+  const { settings, updateSettings } = useSettingsStore();
+  
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadHero();
-  }, [loadHero]);
+  const [editingSettings, setEditingSettings] = useState<AppSettings | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,57 +58,16 @@ export default function AdminPanel() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setUploadingImage(true);
-    setUploadError(null);
-    
-    try {
-      // Comprimir imagem antes do upload
-      const compressedBlob = await compressImage(file, 1200, 0.85);
-      const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
-      
-      // Fazer upload
-      const result = await uploadImage(compressedFile);
-      
-      if (result.success) {
-        callback(result.url);
-      } else {
-        setUploadError(result.error || 'Erro ao fazer upload da imagem');
+    if (file) {
+      try {
+        const compressedBase64 = await compressImage(file);
+        callback(compressedBase64);
+      } catch (error) {
+        console.error("Error compressing image:", error);
+        alert("Erro ao processar a imagem. Tente uma imagem menor.");
       }
-    } catch (error) {
-      console.error('Erro no upload:', error);
-      setUploadError('Erro ao processar imagem. Tente novamente.');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  const handleHeroImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setUploadingImage(true);
-    setUploadError(null);
-    
-    try {
-      const compressedBlob = await compressImage(file, 2000, 0.85);
-      const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
-      
-      const result = await uploadImage(compressedFile);
-      
-      if (result.success) {
-        updateHero({ ...hero, backgroundImage: result.url });
-      } else {
-        setUploadError(result.error || 'Erro ao fazer upload do banner');
-      }
-    } catch (error) {
-      console.error('Erro no upload do hero:', error);
-      setUploadError('Erro ao processar banner. Tente novamente.');
-    } finally {
-      setUploadingImage(false);
     }
   };
 
@@ -123,6 +111,13 @@ export default function AdminPanel() {
     setEditingCourse(null);
   };
 
+  const saveSettings = async () => {
+    if (editingSettings) {
+      await updateSettings(editingSettings);
+      alert('Configurações salvas com sucesso!');
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -146,116 +141,113 @@ export default function AdminPanel() {
     );
   }
 
-  if (activeTab === 'hero') {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Configurar Hero</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('courses')}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200"
-            >
-              <Home className="w-5 h-5" /> Voltar aos Cursos
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Título Principal (antes do destaque)</label>
-              <input
-                type="text"
-                value={hero.title}
-                onChange={e => updateHero({ ...hero, title: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg"
-                placeholder="Sua voz, sua "
-              />
-              <p className="text-xs text-gray-500 mt-1">Ex: "Sua voz, sua "</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Título Destaque (cor indigo)</label>
-              <input
-                type="text"
-                value={hero.titleHighlight}
-                onChange={e => updateHero({ ...hero, titleHighlight: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg"
-                placeholder="carreira"
-              />
-              <p className="text-xs text-gray-500 mt-1">Ex: "carreira"</p>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Subtítulo</label>
-              <textarea
-                value={hero.subtitle}
-                onChange={e => updateHero({ ...hero, subtitle: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg h-24"
-                placeholder="Descrição do hero"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Imagem de Fundo (Banner)</label>
-              <div className="flex items-center gap-4">
-                <img src={hero.backgroundImage} alt="Banner" className="w-48 h-28 object-cover rounded-lg border" />
-                <label className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${uploadingImage ? 'bg-gray-300 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200'}`}>
-                  {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
-                  {uploadingImage ? 'Enviando...' : 'Fazer Upload'}
-                  <input type="file" accept="image/*" className="hidden" onChange={handleHeroImageUpload} disabled={uploadingImage} />
-                </label>
-              </div>
-              {uploadError && <p className="text-red-500 text-sm mt-2">{uploadError}</p>}
-            </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-semibold mb-4">Pré-visualização</h3>
-            <div className="relative bg-indigo-950 text-white overflow-hidden rounded-xl h-64">
-              <div className="absolute inset-0 opacity-20">
-                <img
-                  src={hero.backgroundImage}
-                  className="w-full h-full object-cover"
-                  alt="Banner"
-                />
-              </div>
-              <div className="relative z-10 p-8">
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
-                  {hero.title}<span className="text-indigo-400">{hero.titleHighlight}</span>.
-                </h1>
-                <p className="text-lg text-indigo-100 mt-4 max-w-2xl">
-                  {hero.subtitle}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Gerenciar Cursos</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <h1 className="text-3xl font-bold text-gray-900">Painel Administrativo</h1>
+        
+        <div className="flex bg-gray-100 p-1 rounded-lg">
           <button
-            onClick={() => setActiveTab('hero')}
-            className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200"
+            onClick={() => setActiveTab('courses')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${activeTab === 'courses' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
           >
-            <Settings className="w-5 h-5" /> Configurar Hero
+            <BookOpen className="w-4 h-4" /> Cursos
           </button>
-          {!editingCourse && (
-            <button
-              onClick={createNewCourse}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-            >
-              <Plus className="w-5 h-5" /> Novo Curso
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setActiveTab('settings');
+              setEditingSettings(settings);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${activeTab === 'settings' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
+          >
+            <LayoutTemplate className="w-4 h-4" /> Página Inicial
+          </button>
         </div>
       </div>
 
-      {editingCourse ? (
+      {activeTab === 'settings' && editingSettings ? (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Editar Página Inicial</h2>
+            <button onClick={saveSettings} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+              <Save className="w-5 h-5" /> Salvar Alterações
+            </button>
+          </div>
+
+          <div className="space-y-8">
+            {/* Hero Section */}
+            <div>
+              <h3 className="text-lg font-bold border-b pb-2 mb-4">Seção Principal (Hero)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Título Principal (Suporta HTML, ex: &lt;span class="text-indigo-400"&gt;carreira&lt;/span&gt;)</label>
+                  <input
+                    type="text"
+                    value={editingSettings.heroTitle}
+                    onChange={e => setEditingSettings({...editingSettings, heroTitle: e.target.value})}
+                    className="w-full px-4 py-2 border rounded-lg font-mono text-sm"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Subtítulo</label>
+                  <textarea
+                    value={editingSettings.heroSubtitle}
+                    onChange={e => setEditingSettings({...editingSettings, heroSubtitle: e.target.value})}
+                    className="w-full px-4 py-2 border rounded-lg h-24"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Imagem de Fundo (Hero)</label>
+                  <div className="flex items-center gap-4">
+                    <img src={editingSettings.heroImageUrl} alt="Hero" className="w-48 h-24 object-cover rounded-lg border" />
+                    <label className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-200">
+                      <ImageIcon className="w-5 h-5" /> Fazer Upload
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, (base64) => setEditingSettings({...editingSettings, heroImageUrl: base64}))} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Featured Section */}
+            <div>
+              <h3 className="text-lg font-bold border-b pb-2 mb-4">Seção de Destaque</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Título do Destaque (Badge)</label>
+                  <input
+                    type="text"
+                    value={editingSettings.featuredTitle}
+                    onChange={e => setEditingSettings({...editingSettings, featuredTitle: e.target.value})}
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Subtítulo do Destaque (Imagem)</label>
+                  <input
+                    type="text"
+                    value={editingSettings.featuredSubtitle}
+                    onChange={e => setEditingSettings({...editingSettings, featuredSubtitle: e.target.value})}
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Curso em Destaque</label>
+                  <select
+                    value={editingSettings.featuredCourseId}
+                    onChange={e => setEditingSettings({...editingSettings, featuredCourseId: e.target.value})}
+                    className="w-full px-4 py-2 border rounded-lg"
+                  >
+                    {courses.map(course => (
+                      <option key={course.id} value={course.id}>{course.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'courses' && editingCourse ? (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">Editando Curso</h2>
@@ -303,13 +295,11 @@ export default function AdminPanel() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Thumb do Curso (Imagem Principal)</label>
               <div className="flex items-center gap-4">
                 <img src={editingCourse.imageUrl} alt="Thumb" className="w-32 h-20 object-cover rounded-lg border" />
-                <label className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${uploadingImage ? 'bg-gray-300 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200'}`}>
-                  {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
-                  {uploadingImage ? 'Enviando...' : 'Fazer Upload'}
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, (url) => setEditingCourse({...editingCourse, imageUrl: url}))} disabled={uploadingImage} />
+                <label className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-200">
+                  <ImageIcon className="w-5 h-5" /> Fazer Upload
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, (base64) => setEditingCourse({...editingCourse, imageUrl: base64}))} />
                 </label>
               </div>
-              {uploadError && <p className="text-red-500 text-sm mt-2">{uploadError}</p>}
             </div>
           </div>
 
@@ -378,14 +368,13 @@ export default function AdminPanel() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Imagem do Slide</label>
                       <div className="flex items-center gap-4">
                         <img src={lesson.slideBgUrl} alt="Slide" className="w-32 h-20 object-cover rounded-lg border" />
-                        <label className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${uploadingImage ? 'bg-gray-300 cursor-not-allowed' : 'bg-white border hover:bg-gray-50'}`}>
-                          {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                          {uploadingImage ? 'Enviando...' : 'Fazer Upload'}
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, (url) => {
+                        <label className="flex items-center gap-2 bg-white border px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-50">
+                          <ImageIcon className="w-4 h-4" /> Fazer Upload
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, (base64) => {
                             const newLessons = [...editingCourse.lessons];
-                            newLessons[index].slideBgUrl = url;
+                            newLessons[index].slideBgUrl = base64;
                             setEditingCourse({...editingCourse, lessons: newLessons});
-                          })} disabled={uploadingImage} />
+                          })} />
                         </label>
                       </div>
                     </div>
@@ -397,6 +386,14 @@ export default function AdminPanel() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="col-span-full flex justify-end mb-4">
+            <button
+              onClick={createNewCourse}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+            >
+              <Plus className="w-5 h-5" /> Novo Curso
+            </button>
+          </div>
           {courses.map(course => (
             <div key={course.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <img src={course.imageUrl} alt={course.title} className="w-full h-48 object-cover" />
