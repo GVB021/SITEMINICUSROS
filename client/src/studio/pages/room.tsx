@@ -1603,13 +1603,20 @@ export default function RecordingRoom() {
         body: JSON.stringify({ confirm: true }),
       });
       emitVideoEvent("take-decision", { takeId, decision: "rejected", userId: user?.id });
+      
+      // Invalidar queries para remover take imediatamente da UI
+      const takesQueryKey = ["/api/sessions", sessionId, "takes"] as const;
+      const recordingsQueryKey = ["/api/sessions", sessionId, "recordings"] as const;
+      await queryClient.invalidateQueries({ queryKey: takesQueryKey });
+      await queryClient.invalidateQueries({ queryKey: recordingsQueryKey, exact: false });
+      
       toast({ title: "Take Rejeitado", description: "O dublador foi notificado para regravar." });
     } catch (err) {
       toast({ title: "Erro ao rejeitar", variant: "destructive" });
     } finally {
       setIsDirectorSaving(false);
     }
-  }, [reviewingTake, emitVideoEvent, user?.id, toast]);
+  }, [reviewingTake, emitVideoEvent, user?.id, toast, sessionId, queryClient]);
 
   const handleStopRecording = useCallback(async () => {
     if ((recordingStatus !== "recording" && recordingStatus !== "countdown") || !micState) return;
