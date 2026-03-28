@@ -9,7 +9,6 @@ export interface IAuthStorage {
   updateUserStatus(id: string, status: string): Promise<void>;
   updateUserRole(id: string, role: string): Promise<void>;
   updateUserPassword(id: string, passwordHash: string): Promise<void>;
-  updateUser(id: string, data: Partial<User>): Promise<void>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -41,10 +40,6 @@ class AuthStorage implements IAuthStorage {
 
   async updateUserPassword(id: string, passwordHash: string): Promise<void> {
     await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, id));
-  }
-
-  async updateUser(id: string, data: Partial<User>): Promise<void> {
-    await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, id));
   }
 }
 

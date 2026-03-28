@@ -3,46 +3,66 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
-import bcrypt from "bcrypt";
+import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import { authStorage } from "./storage";
 
-export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 12;
-  return await bcrypt.hash(password, saltRounds);
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const buf = scryptSync(password, salt, 64);
+  return `${buf.toString("hex")}.${salt}`;
 }
 
-export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+export function verifyPassword(password: string, storedHash: string): boolean {
   try {
-    return await bcrypt.compare(password, storedHash);
+    const [hashedPassword, salt] = storedHash.split(".");
+    const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
+    const suppliedPasswordBuf = scryptSync(password, salt, 64);
+    return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
   } catch {
     return false;
   }
 }
 
 export function getSession() {
+  const sessionTtlSeconds = 30 * 24 * 60 * 60;
+  const cookieMaxAgeMs = sessionTtlSeconds * 1000;
   const secret = process.env.SESSION_SECRET;
-  if (!secret) {
-    throw new Error("SESSION_SECRET must be set. Did you forget to provide it in environment variables?");
+  if (process.env.NODE_ENV === "production" && !secret) {
+    throw new Error("SESSION_SECRET é obrigatório em produção");
   }
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+  const safeSecret = secret || "dev-session-secret";
+  if (!process.env.DATABASE_URL) {
+    return session({
+      secret: safeSecret,
+      resave: false,
+      saveUninitialized: false,
+      rolling: true,
+      cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: cookieMaxAgeMs,
+      },
+    });
+  }
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL || process.env.REPLIT_DB_URL,
-    createTableIfMissing: true,
-    ttl: sessionTtl,
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: false,
+    ttl: sessionTtlSeconds,
     tableName: "http_sessions",
   });
   return session({
-    secret,
+    secret: safeSecret,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    name: "vhub.sid", // Custom session cookie name
+    rolling: true,
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Standard for cross-origin if needed, but 'lax' is safer for general use
-      maxAge: sessionTtl,
+      sameSite: "lax",
+      maxAge: cookieMaxAgeMs,
     },
   });
 }
@@ -62,8 +82,7 @@ export async function setupAuth(app: Express) {
           if (!user) {
             return done(null, false, { message: "Email ou senha incorretos" });
           }
-          const isPasswordValid = await verifyPassword(password, user.passwordHash || "");
-          if (!user.passwordHash || !isPasswordValid) {
+          if (!user.passwordHash || !verifyPassword(password, user.passwordHash)) {
             return done(null, false, { message: "Email ou senha incorretos" });
           }
           return done(null, user);

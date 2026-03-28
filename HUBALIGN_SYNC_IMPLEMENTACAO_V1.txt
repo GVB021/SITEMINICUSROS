@@ -1,0 +1,72 @@
+HUB ALIGN / ALINHADOR — IMPLEMENTAÇÃO OPERACIONAL V1
+Data: 2026-03-14
+
+1. Escopo implementado
+- Página única de sincronização operacional em /hub-align com três modos:
+  - Sincronização Operacional (local no navegador)
+  - HUB ALIGN via iframe (externo)
+  - Alinhador legado estático (/alinhador/)
+- Engine modular de sincronização por correlação normalizada:
+  - decode de áudio em WAV/MP3/M4A via Web Audio API
+  - normalização, reamostragem e busca com hint + janela
+  - resultado por take: offset, confiança e duração
+- Fluxo one-click:
+  - Upload referência + múltiplos takes
+  - Botão “Sincronizar Automaticamente”
+  - Timeline editável (hint/offset)
+  - Exportação JSON/CSV
+
+2. Arquitetura
+Frontend:
+- hub-align.tsx
+  - Gerencia UI, estado, progresso e mensagens
+  - Aciona engine para cada take
+- audio-sync-engine.ts
+  - decodeAudioFile(file)
+  - estimateSyncOffset({reference, take, sampleRate, hintMs, searchWindowMs})
+
+Diagrama:
+[Upload referência+takes] -> [decodeAudioFile] -> [estimateSyncOffset]
+-> [timeline editável] -> [export JSON/CSV]
+
+3. API Reference (V1 local)
+- decodeAudioFile(file: File)
+  Retorno:
+  {
+    samples: Float32Array,
+    sampleRate: number,
+    rms: number
+  }
+
+- estimateSyncOffset(input)
+  Input:
+  {
+    reference: Float32Array,
+    take: Float32Array,
+    sampleRate: number,
+    hintMs?: number,
+    searchWindowMs?: number
+  }
+  Retorno:
+  {
+    offsetMs: number,
+    confidence: number,
+    durationMs: number
+  }
+
+4. Testes
+- tests/hubalign-engine.test.ts
+  - detecta offset aproximado em sinal determinístico
+  - valida erro para take muito curto
+
+5. Limitações conhecidas
+- V1 não inclui ainda ASR server-side com métrica de 95% garantida.
+- V1 não inclui visão computacional para landmarks faciais.
+- V1 não realiza render final de vídeo sincronizado no backend.
+
+6. Próxima etapa (V2)
+- Pipeline backend de alinhamento avançado:
+  - ASR server-side (Whisper/Faster-Whisper)
+  - visão computacional facial (MediaPipe/OpenCV)
+  - render de vídeo sincronizado (FFmpeg)
+  - endpoints de jobs assíncronos com progress/ETA
