@@ -26,9 +26,9 @@ export default defineConfig(({mode}) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            'ui-vendor': ['lucide-react', 'motion'],
-            'data-vendor': ['zustand', 'localforage'],
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-ui': ['lucide-react', 'motion'],
+            'vendor-data': ['zustand', 'localforage'],
           },
         },
         onwarn(warning, warn) {
