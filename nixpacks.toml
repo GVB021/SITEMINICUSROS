@@ -6,4 +6,3 @@ cmds = ['npm ci --prefer-offline --no-audit']
 
 [phases.build]
 cmds = ['npm run build']
-cacheDirectories = ['node_modules/.cache', 'dist']
