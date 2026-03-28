@@ -26,3 +26,4 @@ Thumbs.db
 
 # Railway
 railway.toml
+.DS_Store

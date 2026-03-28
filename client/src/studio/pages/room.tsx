@@ -120,6 +120,7 @@ export interface DeviceSettings {
   inputGain: number;
   monitorVolume: number;
   voiceCaptureMode: VoiceCaptureMode;
+  videoVolume: number;
 }
 
 export interface Shortcuts {
@@ -308,6 +309,7 @@ export default function RecordingRoom() {
     inputGain: 1.0,
     outputDeviceId: "default",
     monitorVolume: 1.0,
+    videoVolume: 0.8,
   });
   const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
   const [dailyStatus, setDailyStatus] = useState<"conectando" | "conectado" | "desconectado">("desconectado");
@@ -1342,7 +1344,12 @@ export default function RecordingRoom() {
       }
     };
     void applySink();
-  }, [deviceSettings.outputDeviceId, logAudioStep, toast]);
+    
+    // Apply video volume
+    if (videoRef.current) {
+      videoRef.current.volume = Math.max(0, Math.min(1, deviceSettings.videoVolume));
+    }
+  }, [deviceSettings.outputDeviceId, deviceSettings.videoVolume, logAudioStep, toast]);
 
   useEffect(() => {
     return () => {
