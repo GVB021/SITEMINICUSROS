@@ -14,7 +14,6 @@ interface HardwareConfig {
   microphoneGain: number;
   echoCancellation: boolean;
   noiseSuppression: boolean;
-  autoGainControl: boolean;
 }
 
 const DEFAULT_CONFIG: HardwareConfig = {
@@ -24,10 +23,9 @@ const DEFAULT_CONFIG: HardwareConfig = {
   microphoneGain: 50,
   echoCancellation: true,
   noiseSuppression: true,
-  autoGainControl: true,
 };
 
-const STORAGE_KEY = "hardware_config_v1";
+const STORAGE_KEY = "hardware_config_v2";
 
 export function useHardwareControl(sessionId: string) {
   const { toast } = useToast();
@@ -96,7 +94,7 @@ export function useHardwareControl(sessionId: string) {
           deviceId: config.selectedMicrophone || undefined,
           echoCancellation: config.echoCancellation,
           noiseSuppression: config.noiseSuppression,
-          autoGainControl: config.autoGainControl,
+          autoGainControl: false, // Always disabled for professional recording quality
           sampleRate: 48000,
           channelCount: 1,
         },

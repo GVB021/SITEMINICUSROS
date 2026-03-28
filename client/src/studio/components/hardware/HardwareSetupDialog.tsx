@@ -231,17 +231,6 @@ export function HardwareSetupDialog({ open, onOpenChange, sessionId }: HardwareS
                   onCheckedChange={(checked) => setLocalConfig({ ...localConfig, noiseSuppression: checked })}
                 />
               </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <label className="text-sm font-medium">Controle Automático de Ganho</label>
-                  <p className="text-xs text-muted-foreground">Ajusta volume automaticamente</p>
-                </div>
-                <Switch
-                  checked={localConfig.autoGainControl}
-                  onCheckedChange={(checked) => setLocalConfig({ ...localConfig, autoGainControl: checked })}
-                />
-              </div>
             </div>
           </div>
 

@@ -55,20 +55,18 @@ export async function requestMicrophone(
       constraints.deviceId = { exact: deviceId };
     }
 
+    // Always disable AGC in all modes for professional recording quality
+    Object.assign(constraints, {
+      echoCancellation: isHighFidelity ? false : isStudio,
+      noiseSuppression: isHighFidelity ? false : isStudio,
+      autoGainControl: false, // ALWAYS disabled - manual gain control only
+    });
+
     if (isHighFidelity) {
-      // Strict constraints for lossless/raw capture
+      // Additional strict constraints for lossless/raw capture
       Object.assign(constraints, {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
         highpassFilter: false,
         sampleSize: 24, // Attempt 24-bit capture if supported
-      });
-    } else {
-      Object.assign(constraints, {
-        echoCancellation: isStudio,
-        noiseSuppression: isStudio,
-        autoGainControl: isStudio,
       });
     }
 
