@@ -64,6 +64,8 @@ const sessionSchema = z.object({
   scheduledAt: z.string().or(z.date()).transform(val => new Date(val).toISOString()),
   durationMinutes: z.number(),
   status: z.string(),
+  storageProvider: z.string().optional(),
+  takesPath: z.string().optional(),
 });
 
 const staffSchema = z.object({
@@ -212,6 +214,8 @@ export const api = {
         scheduledAt: z.string(),
         durationMinutes: z.number().optional(),
         status: z.string().optional(),
+        storageProvider: z.enum(["supabase", "local"]).optional(),
+        takesPath: z.string().optional(),
       }),
       responses: {
         201: sessionSchema,

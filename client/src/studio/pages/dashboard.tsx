@@ -250,7 +250,7 @@ const Dashboard = memo(function Dashboard({ studioId }: { studioId: string }) {
                         <span className={cn(
                           "px-2 py-1 rounded-md text-[10px] font-medium border",
                           prod.status === 'active' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
-                          prod.status === 'completed' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                          prod.status === 'completed' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
                           "bg-white/5 text-white/40 border-white/10"
                         )}>
                           {prod.status === 'active' ? 'Ativo' : prod.status === 'completed' ? 'Concluído' : 'Arquivado'}

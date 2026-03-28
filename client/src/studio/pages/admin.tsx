@@ -23,6 +23,7 @@ import {
 } from "@studio/components/ui/select";
 import { Label } from "@studio/components/ui/label";
 import { Checkbox } from "@studio/components/ui/checkbox";
+import { Textarea } from "@studio/components/ui/textarea";
 
 type Section =
   | "overview" | "pending" | "users" | "studios" | "productions"
@@ -110,11 +111,11 @@ function OverviewSection() {
       <div>
         <h2 className="text-xl font-semibold mb-4">Visao Geral do Sistema</h2>
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <StatCard label="Usuarios" value={isLoading ? "—" : stats?.users ?? 0} icon={Users} color="text-blue-400" />
+          <StatCard label="Usuarios" value={isLoading ? "—" : stats?.users ?? 0} icon={Users} color="text-primary" />
           <StatCard label="Pendentes" value={isLoading ? "—" : stats?.pendingUsers ?? 0} icon={AlertCircle} color="text-amber-400" />
           <StatCard label="Estudios" value={isLoading ? "—" : stats?.studios ?? 0} icon={Building2} color="text-violet-400" />
           <StatCard label="Producoes" value={isLoading ? "—" : stats?.productions ?? 0} icon={Film} color="text-emerald-400" />
-          <StatCard label="Sessoes" value={isLoading ? "—" : stats?.sessions ?? 0} icon={Calendar} color="text-cyan-400" />
+          <StatCard label="Sessoes" value={isLoading ? "—" : stats?.sessions ?? 0} icon={Calendar} color="text-primary" />
           <StatCard label="Takes" value={isLoading ? "—" : stats?.takes ?? 0} icon={Mic2} color="text-rose-400" />
         </div>
       </div>
@@ -1358,10 +1359,23 @@ function IntegrationsSection() {
   const { toast } = useToast();
   const [folderId, setFolderId] = useState("");
   const [saved, setSaved] = useState(false);
+  const [takesPaths, setTakesPaths] = useState("");
+  const [defaultProvider, setDefaultProvider] = useState<"supabase" | "local">("supabase");
+  const [defaultTakesPath, setDefaultTakesPath] = useState("");
+  const [supabaseBucket, setSupabaseBucket] = useState("");
+  const [supabaseUrl, setSupabaseUrl] = useState("");
+  const [supabaseServiceKey, setSupabaseServiceKey] = useState("");
+  const [showSupabaseServiceKey, setShowSupabaseServiceKey] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["/api/admin/settings"],
     queryFn: () => authFetch("/api/admin/settings") as Promise<Record<string, string>>,
+    refetchInterval: 5000,
+  });
+
+  const { data: storageStatus } = useQuery({
+    queryKey: ["/api/admin/storage/status"],
+    queryFn: () => authFetch("/api/admin/storage/status") as Promise<any>,
     refetchInterval: 5000,
   });
 
@@ -1372,12 +1386,40 @@ function IntegrationsSection() {
 
   const handleSave = async () => {
     if (folderId) await saveMut.mutateAsync({ key: "GOOGLE_DRIVE_FOLDER_ID", value: folderId });
+    if (supabaseUrl) await saveMut.mutateAsync({ key: "SUPABASE_URL", value: supabaseUrl });
+    if (supabaseServiceKey) await saveMut.mutateAsync({ key: "SUPABASE_SERVICE_ROLE_KEY", value: supabaseServiceKey });
+    if (supabaseBucket) await saveMut.mutateAsync({ key: "SUPABASE_BUCKET", value: supabaseBucket });
+    if (defaultProvider) await saveMut.mutateAsync({ key: "DEFAULT_STORAGE_PROVIDER", value: defaultProvider });
+    if (takesPaths) {
+      const list = takesPaths
+        .split("\n")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      await saveMut.mutateAsync({ key: "TAKES_SAVE_PATHS", value: JSON.stringify(list) });
+      if (!defaultTakesPath && list.length > 0) {
+        await saveMut.mutateAsync({ key: "DEFAULT_TAKES_PATH", value: list[0] });
+      }
+    }
+    if (defaultTakesPath) await saveMut.mutateAsync({ key: "DEFAULT_TAKES_PATH", value: defaultTakesPath });
     toast({ title: "Configuracoes salvas" });
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
   const currentFolderId = settings?.GOOGLE_DRIVE_FOLDER_ID || "";
+  const currentBucket = settings?.SUPABASE_BUCKET || storageStatus?.supabaseBucket || "takes";
+  const currentDefaultProvider = (settings?.DEFAULT_STORAGE_PROVIDER === "local" ? "local" : "supabase") as "supabase" | "local";
+  const currentPaths = (() => {
+    try {
+      const raw = settings?.TAKES_SAVE_PATHS || "[]";
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((v) => String(v)).filter(Boolean);
+      return [];
+    } catch {
+      return [];
+    }
+  })();
+  const currentDefaultPath = settings?.DEFAULT_TAKES_PATH || currentPaths[0] || "takes";
 
   return (
     <div className="space-y-6">
@@ -1427,12 +1469,131 @@ function IntegrationsSection() {
         VoiceActorName/
           Character_Actor_Timecode.wav`}</pre>
           </div>
-          <Button onClick={handleSave} disabled={saveMut.isPending || !folderId} className="gap-2" data-testid="button-save-settings">
-            {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {saved ? "Salvo" : "Salvar Configuracoes"}
-          </Button>
         </div>
       </div>
+
+      <div className="vhub-card overflow-hidden">
+        <div className="vhub-card-header">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground/80">
+            <Database className="h-5 w-5" /> Armazenamento Supabase
+          </div>
+        </div>
+        <div className="vhub-card-body space-y-6">
+          <div className="flex items-center gap-3 p-3 rounded-lg border border-white/8 bg-white/3">
+            {storageStatus?.supabaseOk ? (
+              <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-amber-400 shrink-0" />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {storageStatus?.supabaseOk ? "Supabase Conectado" : "Supabase Nao Conectado"}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {storageStatus?.supabaseOk ? "Conexao validada via Storage API" : (storageStatus?.supabaseReason || "Verifique SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY")}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Supabase URL</Label>
+            <Input
+              placeholder={settings?.SUPABASE_URL || "https://<project>.supabase.co"}
+              value={supabaseUrl}
+              onChange={(e) => setSupabaseUrl(e.target.value)}
+              data-testid="input-supabase-url"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Service Role Key (Server)</Label>
+            <div className="relative">
+              <Input
+                type={showSupabaseServiceKey ? "text" : "password"}
+                placeholder={storageStatus?.supabaseConfigured ? "Configurado" : "Nao configurado"}
+                value={supabaseServiceKey}
+                onChange={(e) => setSupabaseServiceKey(e.target.value)}
+                data-testid="input-supabase-service-key"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSupabaseServiceKey((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showSupabaseServiceKey ? "Ocultar chave" : "Mostrar chave"}
+              >
+                {showSupabaseServiceKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Bucket (Supabase Storage)</Label>
+            <Input
+              placeholder={currentBucket}
+              value={supabaseBucket}
+              onChange={(e) => setSupabaseBucket(e.target.value)}
+              data-testid="input-supabase-bucket"
+            />
+            <p className="text-xs text-muted-foreground">
+              Current: <code className="bg-muted px-1 rounded">{currentBucket}</code>
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Armazenamento Padrao ao Criar Sessao</Label>
+            <Select value={defaultProvider} onValueChange={(v) => setDefaultProvider(v as any)}>
+              <SelectTrigger data-testid="select-default-storage-provider">
+                <SelectValue placeholder={currentDefaultProvider} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="supabase">Supabase</SelectItem>
+                <SelectItem value="local">Local</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Current: <code className="bg-muted px-1 rounded">{currentDefaultProvider}</code>
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Caminhos de Salvamento dos Takes (um por linha)</Label>
+            <Textarea
+              value={takesPaths}
+              onChange={(e) => setTakesPaths(e.target.value)}
+              placeholder={(currentPaths.length ? currentPaths : ["takes"]).join("\n")}
+              data-testid="textarea-takes-paths"
+            />
+            <p className="text-xs text-muted-foreground">
+              Current:{" "}
+              <code className="bg-muted px-1 rounded">
+                {(currentPaths.length ? currentPaths : ["takes"]).join(", ")}
+              </code>
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Caminho Padrao</Label>
+            <Select value={defaultTakesPath} onValueChange={setDefaultTakesPath}>
+              <SelectTrigger data-testid="select-default-takes-path">
+                <SelectValue placeholder={currentDefaultPath} />
+              </SelectTrigger>
+              <SelectContent>
+                {(currentPaths.length ? currentPaths : ["takes"]).map((p: string) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Current: <code className="bg-muted px-1 rounded">{currentDefaultPath}</code>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Button onClick={handleSave} disabled={saveMut.isPending} className="gap-2" data-testid="button-save-settings">
+        {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+        {saved ? "Salvo" : "Salvar Configuracoes"}
+      </Button>
     </div>
   );
 }

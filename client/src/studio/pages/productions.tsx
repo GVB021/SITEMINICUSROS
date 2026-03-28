@@ -28,10 +28,13 @@ import {
 } from "@studio/components/ui/design-system";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
 import { pt } from "@studio/lib/i18n";
+import { parseUniversalTimecodeToSeconds } from "@studio/lib/timecode";
 
 interface ScriptLine {
   character: string;
   start: string;
+  tempo?: string;
+  tempoEmSegundos?: number;
   text: string;
   notes?: string;
 }
@@ -311,6 +314,10 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
     return String(val) || "00:00:00";
   };
 
+  const toTempoEmSegundos = (val: any): number => {
+    return parseUniversalTimecodeToSeconds(val ?? "00:00:00", 24);
+  };
+
   const handleScriptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -329,12 +336,31 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
           toast({ title: "Formato nao reconhecido", description: "O JSON deve conter um array ou um objeto com chave 'lines'.", variant: "destructive" });
           return;
         }
-        const normalized: ScriptLine[] = rawLines.map((line: any) => ({
-          character: String(line.character || line.personagem || line.char || line.name || ""),
-          start: toTimecodeString(line.start ?? line.tempo ?? line.timecode ?? line.tc ?? line.in ?? null),
-          text: String(line.text || line.fala || line.dialogue || line.dialog || line.line || ""),
-          notes: String(line.notes || line.notas || line.note || ""),
-        }));
+        const normalized: ScriptLine[] = [];
+        for (let i = 0; i < rawLines.length; i += 1) {
+          const line = rawLines[i];
+          const tempoOriginal = line?.tempo ?? line?.start ?? line?.timecode ?? line?.tc ?? line?.in ?? null;
+          let tempoEmSegundos: number;
+          try {
+            tempoEmSegundos = toTempoEmSegundos(tempoOriginal);
+          } catch (err: any) {
+            toast({
+              title: "Tempo inválido no JSON",
+              description: `Linha ${i + 1}: ${String(tempoOriginal ?? "")} (${String(err?.message || "erro")})`,
+              variant: "destructive",
+            });
+            return;
+          }
+
+          normalized.push({
+            character: String(line?.character || line?.personagem || line?.char || line?.name || ""),
+            start: toTimecodeString(tempoOriginal),
+            tempo: String(tempoOriginal ?? "00:00:00"),
+            tempoEmSegundos,
+            text: String(line?.text || line?.fala || line?.dialogue || line?.dialog || line?.line || ""),
+            notes: String(line?.notes || line?.notas || line?.note || ""),
+          });
+        }
         setScriptLines(normalized);
         setScriptDirty(true);
         toast({ title: `${normalized.length} linha${normalized.length !== 1 ? "s" : ""} carregada${normalized.length !== 1 ? "s" : ""} do arquivo` });
@@ -360,12 +386,31 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
         toast({ title: "Formato nao reconhecido", description: "Cole um array JSON ou um objeto com chave 'lines'.", variant: "destructive" });
         return;
       }
-      const normalized: ScriptLine[] = rawLines.map((line: any) => ({
-        character: String(line.character || line.personagem || line.char || line.name || ""),
-        start: toTimecodeString(line.start ?? line.tempo ?? line.timecode ?? line.tc ?? line.in ?? null),
-        text: String(line.text || line.fala || line.dialogue || line.dialog || line.line || ""),
-        notes: String(line.notes || line.notas || line.note || ""),
-      }));
+      const normalized: ScriptLine[] = [];
+      for (let i = 0; i < rawLines.length; i += 1) {
+        const line = rawLines[i];
+        const tempoOriginal = line?.tempo ?? line?.start ?? line?.timecode ?? line?.tc ?? line?.in ?? null;
+        let tempoEmSegundos: number;
+        try {
+          tempoEmSegundos = toTempoEmSegundos(tempoOriginal);
+        } catch (err: any) {
+          toast({
+            title: "Tempo inválido no JSON",
+            description: `Linha ${i + 1}: ${String(tempoOriginal ?? "")} (${String(err?.message || "erro")})`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        normalized.push({
+          character: String(line?.character || line?.personagem || line?.char || line?.name || ""),
+          start: toTimecodeString(tempoOriginal),
+          tempo: String(tempoOriginal ?? "00:00:00"),
+          tempoEmSegundos,
+          text: String(line?.text || line?.fala || line?.dialogue || line?.dialog || line?.line || ""),
+          notes: String(line?.notes || line?.notas || line?.note || ""),
+        });
+      }
       setScriptLines(normalized);
       setScriptDirty(true);
       setShowJsonModal(false);
@@ -397,7 +442,16 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
   const updateScriptLine = (idx: number, field: keyof ScriptLine, value: string) => {
     setScriptLines(prev => {
       const updated = [...prev];
-      updated[idx] = { ...updated[idx], [field]: value };
+      const next = { ...updated[idx], [field]: value } as ScriptLine;
+      if (field === "start") {
+        next.tempo = value;
+        try {
+          next.tempoEmSegundos = toTempoEmSegundos(value);
+        } catch {
+          next.tempoEmSegundos = undefined;
+        }
+      }
+      updated[idx] = next;
       return updated;
     });
     setScriptDirty(true);
@@ -565,7 +619,7 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
                       <div
                         key={idx}
                         className={`grid grid-cols-[80px_120px_1fr_1fr_40px] gap-0 px-3 py-1.5 border-b border-border/30 items-center hover:bg-muted/30 transition-colors ${
-                          editingLineIdx === idx ? "bg-blue-500/10 ring-1 ring-blue-500/25 ring-inset" : ""
+                          editingLineIdx === idx ? "bg-primary/10 ring-1 ring-primary/25 ring-inset" : ""
                         }`}
                         data-testid={`script-row-${idx}`}
                       >

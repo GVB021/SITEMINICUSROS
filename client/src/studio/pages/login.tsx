@@ -1,510 +1,229 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
+import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@studio/hooks/use-auth";
 import { Input } from "@studio/components/ui/input";
-import { Textarea } from "@studio/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@studio/components/ui/select";
-import { Loader2, ArrowRight, ArrowLeft, UserPlus, CheckCircle2, ShieldCheck, AudioWaveform, Clock3 } from "lucide-react";
-import { useLocation } from "wouter";
-import { pt } from "@studio/lib/i18n";
 import { useToast } from "@studio/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
 import { AppHeader } from "@/components/nav/AppHeader";
 import { MeshGradient } from "@/components/landing/MeshGradient";
 
 export default function Login() {
-  const [mode, setMode] = useState<"login" | "register" | "pending">("login");
-  const [language, setLanguage] = useState<"en" | "pt">(() => {
+  const [lang, setLang] = useState<"en" | "pt">(() => {
     const saved = localStorage.getItem("vhub_language");
     return saved === "pt" ? "pt" : "en";
   });
-  const [showSignInPanel, setShowSignInPanel] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login, isLoggingIn, user, register, isRegistering } = useAuth();
+
+  const { user, login, isLoggingIn } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const content = useMemo(() => ({
-    en: {
-        nav: ["HubDub", "HubSchool", "HubAlign"],
-        signIn: "Sign In",
-        heroTitle: "Voice Dubbing, Redefined.",
-        heroDescription: "The ultimate platform for voice actors, directors, and studios. High-fidelity ADR, real-time collaboration, and intelligent synchronization in one elegant flow.",
-        heroPrimary: "Explore Platform",
-        heroSecondary: "See Workflow",
-        secureAccess: "Secure access for production and recording workspace.",
-        profiles: "Profiles",
-        sessions: "Sessions",
-        liveScheduled: "Live and scheduled",
-        dubbingDirection: "Dubbing • Direction",
-        waitingApproval: "Waiting for approval",
-        approvalHint: "You will be notified by email.",
-        pendingTitle: "Account under review",
-        pendingDescription: "Your account has been created and is waiting for approval.",
-        backToLogin: "Back to sign in",
-        rights: "All rights reserved.",
-        timeline: "Take Timeline",
-        quality: "Assisted Quality",
-        schedule: "Precise Scheduling",
-        delivery: "Organized Delivery",
-        section2Title: "Professional Dubbing Studio",
-        section2Desc: "Advanced tools for high-end voice production. Multi-track recording, real-time monitoring, and seamless project management for the modern industry.",
-        section3Title: "Smart Audio Alignment",
-        section3Desc: "Our proprietary engine ensures perfect lip-sync and timing. Automatically align takes with the original dialogue for flawless results.",
-      },
-      pt: {
-        nav: ["HubDub", "HubSchool", "HubAlign"],
-        signIn: "Sign In",
-        heroTitle: "Dublagem Profissional, Redefinida.",
-        heroDescription: "A plataforma definitiva para dubladores, diretores e estúdios. ADR de alta fidelidade, colaboração em tempo real e sincronia inteligente em um fluxo elegante.",
-        heroPrimary: "Explore Platform",
-        heroSecondary: "See Workflow",
-        secureAccess: "Acesso seguro ao ambiente de produção e gravação.",
-        profiles: "Perfis",
-        sessions: "Sessões",
-        liveScheduled: "Ao vivo e agendadas",
-        dubbingDirection: "Dublador • Direção",
-        waitingApproval: "Aguardando aprovação",
-        approvalHint: "Você será notificado por email.",
-        pendingTitle: "Conta em análise",
-        pendingDescription: "Sua conta foi criada e está aguardando aprovação.",
-        backToLogin: "Voltar para o login",
-        rights: "Todos os direitos reservados.",
-        timeline: "Timeline de Takes",
-        quality: "Qualidade Assistida",
-        schedule: "Agendamento Precisão",
-        delivery: "Entrega Organizada",
-        section2Title: "Studio de Dublagem Profissional",
-        section2Desc: "Ferramentas avançadas para produção de voz de alto nível. Gravação multi-track, monitoramento em tempo real e gestão de projetos para a indústria moderna.",
-        section3Title: "Sincronia Inteligente",
-        section3Desc: "Nosso motor proprietário garante sincronia labial e timing perfeitos. Alinhe takes automaticamente com o diálogo original para resultados impecáveis.",
-      },
-  }[language]), [language]);
-
-  const authText = useMemo(() => language === "pt" ? pt.auth : {
-    login: "Sign In",
-    loginTitle: "Sign In",
-    loginSubtitle: "Access your V.HUB workspace",
-    loginButton: "Sign In",
-    createAccount: "Create Account",
-    newHere: "New here",
-    email: "Email",
-    emailPlaceholder: "Email",
-    password: "Password",
-    passwordPlaceholder: "Password",
-    welcomeBack: "Welcome back",
-    signInSubtitle: "Access your V.HUB workspace",
-    signingIn: "Signing in...",
-    loginFailed: "Login failed",
-    successLogin: "Login successful.",
-    pendingTitle: "Account under review",
-    pendingDescription: "Your account has been created and is waiting for approval.",
-    pendingMessage: "Your account has been created and is waiting for admin approval.",
-    accountCreated: "Account created",
-    registerTitle: "Create Account",
-    registerSubtitle: "Fill in your professional details to create your account",
-    fullName: "Full name",
-    artistName: "Artist name (optional)",
-    phone: "Mobile phone",
-    altPhone: "Alternative phone (optional)",
-    birthDate: "Birth date",
-    city: "City",
-    state: "State",
-    country: "Country",
-    mainLanguage: "Main language",
-    additionalLanguages: "Additional languages (optional)",
-    experience: "Professional experience",
-    specialty: "Specialty",
-    bio: "Short bio",
-    portfolioUrl: "Portfolio link (optional)",
-    selectStudio: "Select studio",
-    registering: "Registering...",
-    signOut: "Sign out",
-    switchStudio: "Switch Studio",
-  }, [language]);
-
-  const registerText = useMemo(() => language === "pt" ? pt.register : {
-    submit: "Create Account",
-    backToLogin: "Back to Sign In",
-  }, [language]);
-
-  const [form, setForm] = useState({
-    fullName: "", artistName: "", email: "", password: "",
-    phone: "", altPhone: "", birthDate: "", city: "", state: "", country: "",
-    mainLanguage: "", additionalLanguages: "", experience: "", specialty: "",
-    bio: "", portfolioUrl: "", studioId: "",
-  });
-
-  const [publicStudios, setPublicStudios] = useState<{ id: string; name: string }[]>([]);
-  const [studiosLoading, setStudiosLoading] = useState(false);
+  useEffect(() => {
+    localStorage.setItem("vhub_language", lang);
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   useEffect(() => {
-    if (mode === "register" && publicStudios.length === 0) {
-      setStudiosLoading(true);
-      fetch("/api/auth/studios-public")
-        .then(res => res.json())
-        .then(data => setPublicStudios(Array.isArray(data) ? data : []))
-        .catch(() => setPublicStudios([]))
-        .finally(() => setStudiosLoading(false));
+    if (user) {
+      setLocation("/hub-dub/studios", { replace: true });
     }
-  }, [mode]);
-
-  useEffect(() => {
-    localStorage.setItem("vhub_language", language);
-    document.documentElement.lang = language;
-  }, [language]);
-
-  // We remove the automatic redirect to /studios if already logged in,
-  // to respect the user's wish that the initial page is always the Login page.
-  useEffect(() => {
-    // No auto-redirect here to allow the login page to be the entry point.
   }, [user, setLocation]);
 
-  // We no longer return null if user exists, allowing the login page to be visible.
-  // The UI can handle showing a "Continue" button if needed.
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
-    login({ email, password }, {
-      onError: (err: any) => {
-        if (err.message === "pending") {
-          setMode("pending");
-        } else {
-          toast({ title: language === "en" ? "Sign in error" : "Erro ao entrar", description: err.message, variant: "destructive" });
-        }
+  const tutorials = useMemo(() => {
+    if (lang === "en") {
+      return [
+        {
+          title: "Fast start in a session",
+          items: [
+            "Use SPACE to play/pause and keep your hand off the mouse.",
+            "Use L to toggle loop on the current line and repeat takes faster.",
+            "Use ←/→ to jump 2s for micro-adjustments.",
+          ],
+        },
+        {
+          title: "Best practices (quality + speed)",
+          items: [
+            "Record in headphones to avoid bleed and keep alignment clean.",
+            "Keep input gain stable; avoid clipping and extreme fixes later.",
+            "Prefer short loops over long playback to keep momentum.",
+          ],
+        },
+        {
+          title: "Text + timing workflow",
+          items: [
+            "If you can't click lines, ask for Text Control authorization.",
+            "Edit only what’s necessary and keep the original intent consistent.",
+            "Work line-by-line and avoid random seeking.",
+          ],
+        },
+      ];
+    }
+    return [
+      {
+        title: "Começo rápido na sessão",
+        items: [
+          "Use SPACE para play/pause e reduza o uso do mouse.",
+          "Use L para alternar loop na fala atual e acelerar a repetição de takes.",
+          "Use ←/→ para saltar 2s e fazer microajustes.",
+        ],
       },
-      onSuccess: async () => {
-        try {
-          const res = await fetch("/api/studios");
-          if (!res.ok) throw new Error(language === "en" ? "Failed to load studios" : "Falha ao buscar estúdios");
-          const studios = await res.json();
-          if (Array.isArray(studios) && studios.length === 1) {
-            setLocation(`/hub-dub/studio/${studios[0].id}/dashboard`);
-          } else {
-            setLocation("/hub-dub/studios");
-          }
-        } catch {
-          setLocation("/hub-dub/studios");
-        }
-      }
-    });
-  };
+      {
+        title: "Melhores práticas (qualidade + velocidade)",
+        items: [
+          "Grave com fones para evitar vazamento e manter o alinhamento limpo.",
+          "Mantenha o ganho estável; evite clip e correções agressivas depois.",
+          "Prefira loops curtos em vez de rodar trechos longos para manter o ritmo.",
+        ],
+      },
+      {
+        title: "Fluxo texto + timing",
+        items: [
+          "Se você não consegue clicar nas falas, peça autorização de Controle de Texto.",
+          "Edite apenas o essencial; mantenha consistência entre takes e revisões.",
+          "Trabalhe fala a fala; evite buscar aleatoriamente no vídeo.",
+        ],
+      },
+    ];
+  }, [lang]);
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fullName || !form.email || !form.password || !form.phone ||
-        !form.city || !form.state || !form.country ||
-        !form.mainLanguage || !form.experience || !form.specialty || !form.bio || !form.studioId) {
-      toast({ title: language === "en" ? "Error" : "Erro", description: language === "en" ? "Fill all required fields." : "Preencha todos os campos obrigatorios.", variant: "destructive" });
+    const safeEmail = email.trim();
+    if (!safeEmail || !password) {
+      toast({ title: lang === "en" ? "Missing fields" : "Campos obrigatórios", variant: "destructive" });
       return;
     }
-    register(form, {
-      onSuccess: () => {
-        setMode("pending");
-      },
-      onError: (err: any) => {
-        toast({ title: language === "en" ? "Failed to create account" : "Erro ao criar conta", description: err.message, variant: "destructive" });
+    login(
+      { email: safeEmail, password },
+      {
+        onSuccess: () => {
+          toast({ title: lang === "en" ? "Signed in" : "Login realizado" });
+          setLocation("/hub-dub/studios", { replace: true });
+        },
+        onError: (err: any) => {
+          toast({
+            title: lang === "en" ? "Login failed" : "Falha no login",
+            description: String(err?.message || (lang === "en" ? "Try again." : "Tente novamente.")),
+            variant: "destructive",
+          });
+        },
       }
-    });
+    );
   };
 
-  const updateForm = (field: string, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-  };
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <AppHeader lang={lang} setLang={setLang} />
 
-  const MarketingBackground = () => (
-    <>
-      <div className="fixed inset-0 z-0 pointer-events-none bg-background" />
-      <MeshGradient />
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.035] bg-[radial-gradient(circle_at_1px_1px,_currentColor_1px,_transparent_0)] text-foreground bg-[length:26px_26px]" />
-    </>
-  );
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="opacity-35 dark:opacity-100">
+          <MeshGradient />
+        </div>
+        <div className="absolute inset-0 bg-white/60 dark:bg-black/35 backdrop-blur-[2px]" />
+      </div>
 
-  if (mode === "pending") {
-    return (
-      <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-        <MarketingBackground />
-        <AppHeader
-          lang={language}
-          setLang={setLanguage}
-          rightCta={{ label: content.signIn, onClick: () => setShowSignInPanel(true) }}
-        />
-        <main className="pt-[60px] px-6 py-16 flex justify-center relative z-10">
-          <div className="w-full max-w-md bg-card border border-border/60 rounded-2xl p-8 shadow-2xl">
-          <div className="flex flex-col items-center text-center space-y-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 blur-xl opacity-60 rounded-full" />
-              <img src="/logo.svg" alt="THE HUB" className="h-16 w-16 relative z-10" />
-            </div>
-            
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {authText.pendingTitle}
+      <main className="relative z-10 pt-[60px]">
+        <div className="max-w-6xl mx-auto px-6 py-12 md:py-16 grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+          <section className="space-y-6">
+            <div className="space-y-3">
+              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
+                {lang === "en" ? "Work faster. Sound better." : "Trabalhe mais rápido. Soe melhor."}
               </h1>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                {authText.pendingDescription}
+              <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                {lang === "en"
+                  ? "Mini tutorials to help you get maximum performance from the dubbing workflow."
+                  : "Mini tutoriais para extrair o máximo de desempenho do fluxo de dublagem."}
               </p>
             </div>
 
-            <div className="w-full p-4 bg-muted/30 border border-border/60 rounded-xl flex items-center gap-3 text-left">
-              <div className="bg-primary/10 p-2 rounded-lg">
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">{content.waitingApproval}</p>
-                <p className="text-xs text-muted-foreground">{content.approvalHint}</p>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setMode("login")}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-            >
-              <ArrowLeft className="w-3 h-3" /> {content.backToLogin}
-            </button>
-          </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (mode === "register") {
-    return (
-      <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-        <MarketingBackground />
-        <AppHeader lang={language} setLang={setLanguage} rightCta={{ label: content.signIn, onClick: () => setShowSignInPanel(true) }} />
-        <main className="pt-[60px] px-6 py-10 relative z-10 flex justify-center">
-          <div className="w-full max-w-4xl">
-            <div className="text-center mb-8">
-              <img src="/logo.svg" alt="THE HUB" className="h-12 w-12 mx-auto mb-4" />
-              <h1 className="text-3xl font-semibold tracking-tight mb-2">{authText.registerTitle}</h1>
-              <p className="text-muted-foreground">{authText.registerSubtitle}</p>
-            </div>
-
-            <form onSubmit={handleRegister} className="bg-card border border-border/60 rounded-2xl p-8 shadow-2xl space-y-8">
-            {/* Form Sections */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-foreground/70 uppercase tracking-wider border-b border-border/60 pb-2">{language === "en" ? "Personal Details" : "Dados Pessoais"}</h3>
-                <div className="space-y-4">
-                  <Input placeholder={authText.fullName} value={form.fullName} onChange={e => updateForm("fullName", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <Input placeholder={authText.artistName} value={form.artistName} onChange={e => updateForm("artistName", e.target.value)} className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <Input type="email" placeholder={authText.emailPlaceholder} value={form.email} onChange={e => updateForm("email", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <Input type="password" placeholder={authText.passwordPlaceholder} value={form.password} onChange={e => updateForm("password", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input placeholder={authText.phone} value={form.phone} onChange={e => updateForm("phone", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                    <Input placeholder={authText.altPhone} value={form.altPhone} onChange={e => updateForm("altPhone", e.target.value)} className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
+            <div className="grid grid-cols-1 gap-4">
+              {tutorials.map((block) => (
+                <motion.div
+                  key={block.title}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35 }}
+                  className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur-xl p-5"
+                >
+                  <div className="text-xs font-semibold tracking-[0.22em] uppercase text-muted-foreground">
+                    {block.title}
                   </div>
-                  <Input type="date" placeholder={authText.birthDate} value={form.birthDate} onChange={e => updateForm("birthDate", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
+                  <ul className="mt-3 space-y-2 text-sm text-foreground/90">
+                    {block.items.map((item) => (
+                      <li key={item} className="flex gap-2">
+                        <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-foreground/35 shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          <section className="lg:sticky lg:top-[92px]">
+            <div className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur-xl p-6 md:p-7">
+              <div className="space-y-2 mb-6">
+                <div className="text-xs font-semibold tracking-[0.22em] uppercase text-muted-foreground">
+                  {lang === "en" ? "Login" : "Login"}
                 </div>
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  {lang === "en" ? "Access your workspace" : "Acesse seu workspace"}
+                </h2>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-foreground/70 uppercase tracking-wider border-b border-border/60 pb-2">{language === "en" ? "Location and Profile" : "Localização e Perfil"}</h3>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                     <Input placeholder={authText.city} value={form.city} onChange={e => updateForm("city", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                     <Input placeholder={authText.state} value={form.state} onChange={e => updateForm("state", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                     <Input placeholder={authText.country} value={form.country} onChange={e => updateForm("country", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  </div>
-                  <Input placeholder={authText.mainLanguage} value={form.mainLanguage} onChange={e => updateForm("mainLanguage", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <Input placeholder={authText.additionalLanguages} value={form.additionalLanguages} onChange={e => updateForm("additionalLanguages", e.target.value)} className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <Input placeholder={authText.experience} value={form.experience} onChange={e => updateForm("experience", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <Input placeholder={authText.specialty} value={form.specialty} onChange={e => updateForm("specialty", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  <Textarea placeholder={authText.bio} value={form.bio} onChange={e => updateForm("bio", e.target.value)} required className="bg-background border-border/70 focus:border-primary/50 min-h-[80px] text-foreground placeholder:text-muted-foreground" />
-                  <Input placeholder={authText.portfolioUrl} value={form.portfolioUrl} onChange={e => updateForm("portfolioUrl", e.target.value)} className="bg-background border-border/70 focus:border-primary/50 text-foreground placeholder:text-muted-foreground" />
-                  
-                  {studiosLoading ? (
-                    <div className="flex justify-center p-2"><Loader2 className="animate-spin text-primary" /></div>
+              <form onSubmit={submit} className="space-y-4" data-testid="form-login">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">{lang === "en" ? "Email" : "Email"}</label>
+                  <Input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={lang === "en" ? "you@studio.com" : "voce@estudio.com"}
+                    autoComplete="email"
+                    data-testid="input-email"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">{lang === "en" ? "Password" : "Senha"}</label>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={lang === "en" ? "Password" : "Senha"}
+                    autoComplete="current-password"
+                    data-testid="input-password"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full h-11 rounded-xl bg-foreground text-background font-semibold text-sm transition-opacity disabled:opacity-60"
+                  data-testid="button-submit-login"
+                >
+                  {isLoggingIn ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {lang === "en" ? "Signing in..." : "Entrando..."}
+                    </span>
                   ) : (
-                    <Select value={form.studioId} onValueChange={v => updateForm("studioId", v)}>
-                      <SelectTrigger className="bg-background border-border/70 focus:border-primary/50">
-                        <SelectValue placeholder={authText.selectStudio} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {publicStudios.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <span>{lang === "en" ? "Sign in" : "Entrar"}</span>
                   )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-border/60">
-              <button
-                type="button"
-                onClick={() => setMode("login")}
-                className="px-6 py-3 rounded-lg border border-border/60 hover:bg-muted/30 text-muted-foreground transition-colors flex items-center justify-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                {registerText.backToLogin}
-              </button>
-              <button
-                type="submit"
-                disabled={isRegistering}
-                className="flex-1 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
-              >
-                {isRegistering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {registerText.submit} <UserPlus className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
-          </div>
-        </main>
-      </div>
-    );
-  }
-  return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-x-hidden">
-      <MarketingBackground />
-      <AppHeader lang={language} setLang={setLanguage} rightCta={{ label: content.signIn, onClick: () => setShowSignInPanel(true) }} />
-
-      <main className="pt-[60px] relative z-10">
-        <section className="max-w-[1400px] mx-auto px-6 pt-16 pb-10 grid md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-7">
-            <h1 className="text-5xl md:text-6xl font-semibold leading-[1.02] tracking-tight">
-              {content.heroTitle}
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl">
-              {content.heroDescription}
-            </p>
-
-            <div className="grid gap-3 max-w-xl">
-              <div className="flex items-center gap-3 text-sm text-foreground/80">
-                <ShieldCheck className="w-4 h-4 text-primary" />
-                <span>{content.secureAccess}</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-foreground/80">
-                <AudioWaveform className="w-4 h-4 text-primary" />
-                <span>{content.timeline}</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-foreground/80">
-                <Clock3 className="w-4 h-4 text-primary" />
-                <span>{content.schedule}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowSignInPanel(true)}
-                className="h-11 px-6 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-              >
-                {content.heroPrimary}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLocation("/hub-dub/studios")}
-                className="h-11 px-6 rounded-full border border-border/70 hover:bg-muted/30 transition-colors"
-              >
-                {content.heroSecondary}
-              </button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="relative aspect-[16/10] bg-card rounded-2xl border border-border/60 shadow-2xl overflow-hidden">
-              <img src="/landing/hubdub-mic.svg" alt="HubDub Studio" className="absolute inset-0 w-full h-full object-cover opacity-90" />
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/15 to-transparent" />
-            </div>
-            <div className="absolute -inset-6 bg-primary/10 blur-3xl -z-10" />
-          </div>
-        </section>
-
-        <section className="max-w-[1400px] mx-auto px-6 pb-16">
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="rounded-2xl bg-card border border-border/60 p-6">
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <CheckCircle2 className="w-5 h-5 text-primary" />
-              </div>
-              <h3 className="font-semibold tracking-tight mb-2">{content.quality}</h3>
-              <p className="text-sm text-muted-foreground">{content.delivery}</p>
-            </div>
-            <div className="rounded-2xl bg-card border border-border/60 p-6">
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <AudioWaveform className="w-5 h-5 text-primary" />
-              </div>
-              <h3 className="font-semibold tracking-tight mb-2">{content.timeline}</h3>
-              <p className="text-sm text-muted-foreground">{content.dubbingDirection}</p>
-            </div>
-            <div className="rounded-2xl bg-card border border-border/60 p-6">
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <Clock3 className="w-5 h-5 text-primary" />
-              </div>
-              <h3 className="font-semibold tracking-tight mb-2">{content.schedule}</h3>
-              <p className="text-sm text-muted-foreground">{content.liveScheduled}</p>
-            </div>
-          </div>
-        </section>
-
-        <div className="px-6 pb-10 text-xs text-muted-foreground max-w-[1400px] mx-auto">
-          © {new Date().getFullYear()} THE HUB. {content.rights}
-        </div>
-      </main>
-
-      <AnimatePresence>
-        {showSignInPanel ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/45 p-4 flex items-center justify-center"
-            onClick={() => setShowSignInPanel(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.98 }}
-              transition={{ duration: 0.22 }}
-              className="w-full max-w-md bg-background border border-border/70 rounded-2xl p-8 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex flex-col space-y-2 text-center mb-8">
-                <h2 className="text-2xl font-semibold tracking-tight text-foreground">{authText.loginTitle}</h2>
-                <p className="text-sm text-muted-foreground">{authText.loginSubtitle}</p>
-              </div>
-
-              <form onSubmit={handleLogin} className="space-y-5">
-                <div className="space-y-4">
-                  <Input type="email" placeholder={authText.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background border-border/70 focus:border-primary/60 focus:ring-primary/25 h-11 transition-all text-foreground placeholder:text-muted-foreground" />
-                  <Input type="password" placeholder={authText.passwordPlaceholder} value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background border-border/70 focus:border-primary/60 focus:ring-primary/25 h-11 transition-all text-foreground placeholder:text-muted-foreground" />
-                </div>
-
-                <button type="submit" disabled={isLoggingIn} className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2">
-                  {isLoggingIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {authText.loginButton} <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
 
-              <div className="grid grid-cols-2 gap-2 mt-5 mb-6">
-                <div className="rounded-lg border border-border/70 bg-muted/20 p-2 text-center">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{content.profiles}</p>
-                  <p className="text-xs text-foreground">{content.dubbingDirection}</p>
-                </div>
-                <div className="rounded-lg border border-border/70 bg-muted/20 p-2 text-center">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{content.sessions}</p>
-                  <p className="text-xs text-foreground">{content.liveScheduled}</p>
-                </div>
+              <div className="mt-5 text-xs text-muted-foreground leading-relaxed">
+                {lang === "en"
+                  ? "Tip: if you can’t control the script, ask a director/admin to grant Text Control."
+                  : "Dica: se você não consegue controlar o roteiro, peça para diretor/admin liberar o Controle de Texto."}
               </div>
-
-              <div className="relative my-7">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border/60" /></div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">{authText.newHere}</span>
-                </div>
-              </div>
-
-              <button onClick={() => { setShowSignInPanel(false); setMode("register"); }} className="w-full h-11 border border-border/70 hover:bg-muted/30 text-foreground font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
-                {authText.createAccount}
-              </button>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
+

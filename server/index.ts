@@ -4,8 +4,11 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { setupVideoSync } from "./video-sync";
+import { setupRealtime, broadcastInvalidate } from "./realtime";
 import { registerMeRestore } from "./me-restore";
 import { registerVoiceJobs } from "./voice-jobs";
+import { pool } from "./db";
+import { configureSupabase } from "./lib/supabase";
 import path from "path";
 
 const app = express();
@@ -87,14 +90,68 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  res.on("finish", () => {
+    const isApi = req.path.startsWith("/api");
+    const isMutation = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+    const ok = res.statusCode >= 200 && res.statusCode < 300;
+    if (isApi && isMutation && ok) {
+      broadcastInvalidate(req.method, req.path);
+    }
+  });
+  next();
+});
+
 (async () => {
+  await pool.query(`
+    ALTER TABLE IF EXISTS recording_sessions
+      ADD COLUMN IF NOT EXISTS storage_provider text DEFAULT 'supabase',
+      ADD COLUMN IF NOT EXISTS takes_path text DEFAULT 'uploads';
+  `);
+  await pool.query(`
+    UPDATE recording_sessions
+    SET storage_provider = COALESCE(storage_provider, 'supabase'),
+        takes_path = COALESCE(takes_path, 'uploads');
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      user_id varchar PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      data jsonb NOT NULL DEFAULT '{}'::jsonb,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS user_profiles_user_id_idx ON user_profiles(user_id);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS studio_profiles (
+      studio_id varchar PRIMARY KEY REFERENCES studios(id) ON DELETE CASCADE,
+      data jsonb NOT NULL DEFAULT '{}'::jsonb,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS studio_profiles_studio_id_idx ON studio_profiles(studio_id);`);
+
+  try {
+    const { rows } = await pool.query(
+      "SELECT key, value FROM platform_settings WHERE key IN ('SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY')"
+    );
+    const map: Record<string, string> = {};
+    for (const r of rows as any[]) {
+      map[String(r.key)] = String(r.value);
+    }
+    configureSupabase({ url: map.SUPABASE_URL, serviceRoleKey: map.SUPABASE_SERVICE_ROLE_KEY });
+  } catch {}
+
   await setupAuth(app);
   registerAuthRoutes(app);
   registerVoiceJobs(app);
   registerMeRestore(app);
   await registerRoutes(httpServer, app);
   setupVideoSync(httpServer);
-
+  setupRealtime(app);
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
