@@ -2492,16 +2492,6 @@ export default function RecordingRoom() {
         }
       />
 
-      {isMobile && (
-        <DailyMeetPanel
-          sessionId={sessionId}
-          zIndexBase={UI_LAYER_BASE.chatPanel}
-          open={dailyMeetOpen}
-          onOpenChange={setDailyMeetOpen}
-          onStatusChange={setDailyStatus}
-          mode="floating"
-        />
-      )}
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* ── MOBILE LAYOUT ── portrait: video → controls → script strip */}
@@ -2550,42 +2540,56 @@ export default function RecordingRoom() {
               />
             </div>
 
-            {/* Inline script strip (portrait) + landscape right column */}
-            <div className="flex-1 overflow-y-auto landscape:w-[40%] landscape:shrink-0 landscape:border-l landscape:border-border/40" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-              {displayedScriptLines.map((line) => {
-                const i = line.originalIndex;
-                const isActive = i === currentLine;
-                const isDone = savedTakes.has(i);
-                return (
-                  <div
-                    key={i}
-                    data-line-index={i}
-                    onClick={() => { if (canControlVideo) { setCurrentLine(i); emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); } }}
-                    className={cn(
-                      "px-4 py-3 border-b border-border/20 transition-colors",
-                      isActive ? "bg-primary/10 border-l-2 border-l-primary" : "active:bg-muted/30",
-                      isDone && "opacity-70"
-                    )}
-                  >
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[10px] font-mono text-muted-foreground/60">#{i + 1}</span>
-                      <span className={cn("text-[11px] font-bold uppercase tracking-widest", isActive ? "text-primary" : "text-muted-foreground")}>
-                        {line.character}
-                      </span>
-                      {isDone && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-                    </div>
-                    <p
-                      className={cn("leading-snug text-sm", isActive ? "text-foreground font-medium" : "text-muted-foreground")}
-                      style={{ fontSize: `${scriptFontSize}px` }}
+            {/* Script + Daily column (portrait + landscape right column) */}
+            <div className="flex-1 landscape:w-[40%] landscape:shrink-0 landscape:border-l landscape:border-border/40 flex flex-col overflow-hidden">
+              {/* Script section — 80% */}
+              <div className="h-[80%] overflow-y-auto border-b border-border/40">
+                {displayedScriptLines.map((line) => {
+                  const i = line.originalIndex;
+                  const isActive = i === currentLine;
+                  const isDone = savedTakes.has(i);
+                  return (
+                    <div
+                      key={i}
+                      data-line-index={i}
+                      onClick={() => { if (canControlVideo) { setCurrentLine(i); emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); } }}
+                      className={cn(
+                        "px-4 py-3 border-b border-border/20 transition-colors",
+                        isActive ? "bg-primary/10 border-l-2 border-l-primary" : "active:bg-muted/30",
+                        isDone && "opacity-70"
+                      )}
                     >
-                      {liveDrafts[i] || line.text}
-                    </p>
-                  </div>
-                );
-              })}
-              {displayedScriptLines.length === 0 && (
-                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Nenhuma linha no roteiro</div>
-              )}
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] font-mono text-muted-foreground/60">#{i + 1}</span>
+                        <span className={cn("text-[11px] font-bold uppercase tracking-widest", isActive ? "text-primary" : "text-muted-foreground")}>
+                          {line.character}
+                        </span>
+                        {isDone && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                      </div>
+                      <p
+                        className={cn("leading-snug text-sm", isActive ? "text-foreground font-medium" : "text-muted-foreground")}
+                        style={{ fontSize: `${scriptFontSize}px` }}
+                      >
+                        {liveDrafts[i] || line.text}
+                      </p>
+                    </div>
+                  );
+                })}
+                {displayedScriptLines.length === 0 && (
+                  <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Nenhuma linha no roteiro</div>
+                )}
+              </div>
+
+              {/* Daily.co section — 20% */}
+              <div className="h-[20%] shrink-0" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+                <DailyMeetPanel
+                  sessionId={sessionId}
+                  open={dailyMeetOpen}
+                  onOpenChange={setDailyMeetOpen}
+                  onStatusChange={setDailyStatus}
+                  mode="embedded"
+                />
+              </div>
             </div>
 
             {/* Landscape: controls overlay at bottom of video column */}
