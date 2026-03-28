@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = parseInt(process.env.PORT || "3000", 10);
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
@@ -24,8 +24,23 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(__dirname, 'dist');
+    
+    // Disable cache for fresh content
+    app.use((req, res, next) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      next();
+    });
+    
     app.use(express.static(distPath));
+    
+    // SPA fallback - ONLY for non-asset routes
     app.get('*', (req, res) => {
+      // Don't serve HTML for asset requests
+      if (req.path.startsWith('/assets/')) {
+        return res.status(404).send('Asset not found');
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
