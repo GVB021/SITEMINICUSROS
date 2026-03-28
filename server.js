@@ -8,20 +8,24 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const distPath = path.join(__dirname, 'dist');
 
-// Serve arquivos estáticos com cache
-app.use(express.static(distPath, {
-  maxAge: '1d',
-  etag: true
-}));
+// Desabilitar cache para evitar problemas de MIME type
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
-// SPA fallback - apenas se não for um arquivo real
+// Serve arquivos estáticos
+app.use(express.static(distPath));
+
+// SPA fallback - NUNCA serve HTML para /assets/
 app.get('*', (req, res) => {
-  const filePath = path.join(distPath, req.path);
-  // Se o arquivo existe, deixa o static middleware servir
-  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    return res.sendFile(filePath);
+  // Se é um asset, retorna 404 se não existe
+  if (req.path.startsWith('/assets/')) {
+    return res.status(404).send('Asset not found');
   }
-  // Caso contrário, serve index.html para SPA
+  // Para rotas de página, serve index.html
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
