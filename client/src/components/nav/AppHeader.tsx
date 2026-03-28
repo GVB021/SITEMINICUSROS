@@ -1,20 +1,18 @@
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { LanguageThemePill } from "@/components/nav/LanguageThemePill";
-import { useAuth } from "@/hooks/use-auth";
 
 export function AppHeader({
   lang,
   setLang,
+  rightCta,
 }: {
   lang: "en" | "pt";
   setLang: (lang: "en" | "pt") => void;
+  rightCta?: { label: string; href?: string; onClick?: () => void };
 }) {
-  const { user, isLoading, logout, isLoggingOut } = useAuth();
-  const [, navigate] = useLocation();
-
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-transparent">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-[20px] border-b border-border/60 transition-colors duration-300">
       <div className="max-w-[1400px] mx-auto px-6 h-[60px] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/">
@@ -29,38 +27,38 @@ export function AppHeader({
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
+        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
           <Link href="/hub-dub/login" className="hover:text-foreground transition-colors">
-            HUBDUB
+            HubDub
           </Link>
           <Link href="/hubschool" className="hover:text-foreground transition-colors">
-            HUBSCHOOL
+            HubSchool
           </Link>
           <Link href="/hub-align" className="hover:text-foreground transition-colors">
-            HUBALIGN
+            HubAlign
           </Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <LanguageThemePill lang={lang} setLang={setLang} />
-          {!isLoading && (
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full px-5 h-10 bg-transparent"
-              onClick={() => {
-                if (user) {
-                  logout();
-                } else {
-                  navigate("/hub-dub/login");
-                }
-              }}
-              disabled={!!user && isLoggingOut}
-              data-testid="button-auth"
-            >
-              {user ? "SAIR" : "ENTRAR"}
-            </Button>
-          )}
+          {rightCta ? (
+            rightCta.href ? (
+              <Link href={rightCta.href}>
+                <Button variant="outline" className="rounded-full px-5 h-10">
+                  {rightCta.label}
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full px-5 h-10"
+                onClick={rightCta.onClick}
+              >
+                {rightCta.label}
+              </Button>
+            )
+          ) : null}
         </div>
       </div>
     </header>

@@ -21,9 +21,9 @@
     --popover-foreground: 240 10% 3.9%;
     --popover-border: 240 5.9% 90%;
 
-    --primary: 221 83% 53%;
+    --primary: 211 100% 50%; /* #0071e3 - Apple Blue */
     --primary-foreground: 0 0% 100%;
-    --primary-border: 221 83% 53%;
+    --primary-border: 211 100% 50%;
 
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
@@ -43,28 +43,28 @@
 
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 221 83% 53%;
+    --ring: 211 100% 50%;
 
     --radius: 1rem; /* More rounded corners */
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar: 0 0% 98%;
-    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-primary-border: 221 83% 53%;
+    --sidebar-primary-border: 211 100% 50%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-accent-border: 240 5.9% 90%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 221 83% 53%;
+    --sidebar-ring: 211 100% 50%;
 
     --glass-bg: rgba(255, 255, 255, 0.7);
     --glass-bg-hover: rgba(255, 255, 255, 0.8);
     --glass-border: rgba(0, 0, 0, 0.05);
     --glass-border-hover: rgba(0, 0, 0, 0.1);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
-    --glass-shadow-hover: 0 8px 32px 0 rgba(0, 0, 0, 0.14);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    --glass-shadow-hover: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
   }
 
   .dark {
@@ -80,9 +80,9 @@
     --popover-foreground: 0 0% 95%;
     --popover-border: 240 3.7% 15.9%;
 
-    --primary: 221 83% 53%;
+    --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;
-    --primary-border: 221 83% 53%;
+    --primary-border: 211 100% 50%;
 
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
@@ -102,19 +102,19 @@
 
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 221 83% 53%;
+    --ring: 211 100% 50%;
     
     --sidebar-background: 240 10% 9%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar: 240 10% 9%;
-    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-primary-border: 221 83% 53%;
+    --sidebar-primary-border: 211 100% 50%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-accent-border: 240 3.7% 15.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 221 83% 53%;
+    --sidebar-ring: 211 100% 50%;
 
     --glass-bg: rgba(0, 0, 0, 0.6);
     --glass-bg-hover: rgba(0, 0, 0, 0.7);
@@ -168,8 +168,8 @@
     color: rgba(255,255,255,0.30) !important;
   }
   input:focus, textarea:focus, select:focus, [role="combobox"]:focus {
-    border-color: hsl(var(--primary) / 0.50) !important;
-    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15) !important;
+    border-color: hsl(220 100% 55% / 0.50) !important;
+    box-shadow: 0 0 0 3px hsl(220 100% 55% / 0.15) !important;
   } */
 
   [role="dialog"], [data-radix-popper-content-wrapper] [role="listbox"],
@@ -359,8 +359,8 @@
     color: rgba(255,255,255,0.30);
   }
   .vhub-input:focus {
-    border-color: hsl(var(--primary) / 0.50);
-    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+    border-color: hsl(220 100% 55% / 0.50);
+    box-shadow: 0 0 0 3px hsl(220 100% 55% / 0.15);
     outline: none;
   }
 
@@ -403,7 +403,7 @@
   }
   .vhub-label-accent {
     @apply text-[10px] font-semibold uppercase tracking-[0.12em];
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(350 90% 65%));
+    background: linear-gradient(135deg, hsl(220 100% 65%), hsl(270 80% 70%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -487,8 +487,8 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .glow-primary {
-    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 0 16px hsl(var(--primary) / 0.12);
+  .glow-blue {
+    box-shadow: 0 0 0 1px hsl(220 100% 55% / 0.3), 0 0 16px hsl(220 100% 55% / 0.12);
   }
   .glow-violet {
     box-shadow: 0 0 0 1px hsl(270 80% 60% / 0.3), 0 0 16px hsl(270 80% 60% / 0.12);
@@ -501,7 +501,7 @@
   }
 
   .gradient-text {
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(350 90% 65%));
+    background: linear-gradient(135deg, hsl(220 100% 65%), hsl(270 80% 70%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -548,7 +548,7 @@
 
   .status-active    { background: rgba(16,185,129,0.12); color: hsl(160 84% 60%); border: 1px solid rgba(16,185,129,0.25); }
   .status-planned   { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.10); }
-  .status-completed { background: rgba(59,130,246,0.12); color: hsl(221 83% 60%); border: 1px solid rgba(59,130,246,0.25); }
+  .status-completed { background: rgba(59,130,246,0.12); color: hsl(217 91% 70%); border: 1px solid rgba(59,130,246,0.25); }
   .status-cancelled { background: rgba(239,68,68,0.12); color: hsl(0 72% 65%); border: 1px solid rgba(239,68,68,0.25); }
 
   @keyframes hubdubBorderSpin {
@@ -557,7 +557,7 @@
   }
 
   .hubdub-borderbeam {
-    --hubdub-beam: rgba(59, 130, 246, 0.95);
+    --hubdub-beam: rgba(166, 124, 82, 0.95);
     padding: 1px;
     background: conic-gradient(
       from 180deg,
@@ -566,7 +566,7 @@
       var(--hubdub-beam) 34%,
       rgba(0,0,0,0) 46%,
       rgba(0,0,0,0) 58%,
-      rgba(96, 165, 250, 0.85) 72%,
+      rgba(212,175,55,0.85) 72%,
       rgba(0,0,0,0) 84%,
       rgba(0,0,0,0) 100%
     );
@@ -581,7 +581,7 @@
     mask-composite: exclude;
     animation: hubdubBorderSpin 2.9s linear infinite;
     opacity: 0.95;
-    filter: drop-shadow(0 0 18px rgba(59, 130, 246, 0.18));
+    filter: drop-shadow(0 0 18px rgba(166, 124, 82, 0.18));
   }
 
   @keyframes hubdubSheen {

@@ -1,2 +1,0 @@
-# PARALELO
-# PARALELO

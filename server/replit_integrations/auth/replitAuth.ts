@@ -24,24 +24,17 @@ export function verifyPassword(password: string, storedHash: string): boolean {
 }
 
 export function getSession() {
-  const sessionTtlSeconds = 30 * 24 * 60 * 60;
-  const cookieMaxAgeMs = sessionTtlSeconds * 1000;
-  const secret = process.env.SESSION_SECRET;
-  if (process.env.NODE_ENV === "production" && !secret) {
-    throw new Error("SESSION_SECRET é obrigatório em produção");
-  }
-  const safeSecret = secret || "dev-session-secret";
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+  const secret = process.env.SESSION_SECRET || "dev-session-secret";
   if (!process.env.DATABASE_URL) {
     return session({
-      secret: safeSecret,
+      secret,
       resave: false,
       saveUninitialized: false,
-      rolling: true,
       cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: cookieMaxAgeMs,
+        maxAge: sessionTtl,
       },
     });
   }
@@ -49,20 +42,18 @@ export function getSession() {
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: false,
-    ttl: sessionTtlSeconds,
+    ttl: sessionTtl,
     tableName: "http_sessions",
   });
   return session({
-    secret: safeSecret,
+    secret,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    rolling: true,
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: cookieMaxAgeMs,
+      maxAge: sessionTtl,
     },
   });
 }

@@ -338,7 +338,7 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <StatCard label="Membros" value={stats?.members ?? 0} icon={<Users className="w-4 h-4 text-primary" />} />
-                  <StatCard label="Pendentes" value={stats?.pendingMembers ?? 0} icon={<UserPlus className="w-4 h-4 text-blue-500" />} />
+                  <StatCard label="Pendentes" value={stats?.pendingMembers ?? 0} icon={<UserPlus className="w-4 h-4 text-amber-500" />} />
                   <StatCard label="Producoes" value={stats?.productions ?? 0} icon={<Film className="w-4 h-4 text-violet-500" />} />
                   <StatCard label="Sessoes" value={stats?.sessions ?? 0} icon={<Calendar className="w-4 h-4 text-emerald-500" />} />
                   <StatCard label="Takes" value={stats?.takes ?? 0} icon={<Mic2 className="w-4 h-4 text-rose-500" />} />
@@ -350,7 +350,7 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
           {activeTab === "pending" && (
             <div className="space-y-4 page-enter">
               <div className="flex items-center gap-2 mb-2">
-                <UserPlus className="w-4 h-4 text-blue-500" />
+                <UserPlus className="w-4 h-4 text-amber-500" />
                 <h3 className="text-sm font-semibold text-foreground">Cadastros Pendentes</h3>
                 {(pendingMembers?.length ?? 0) > 0 && (
                   <Badge variant="secondary">{pendingMembers.length}</Badge>
@@ -365,7 +365,7 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
                   <div key={m.id} className="vhub-card p-4" data-testid={`pending-member-${m.id}`}>
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-sm shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-amber-500/15 ring-1 ring-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-sm shrink-0">
                           {(m.user?.fullName || m.user?.email || "?").charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">

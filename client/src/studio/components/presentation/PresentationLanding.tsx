@@ -1,5 +1,5 @@
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Network, GraduationCap, AudioWaveform } from "lucide-react";
 import { Button } from "@studio/components/ui/button";
@@ -18,7 +18,7 @@ export default function PresentationLanding() {
           <div className="w-8 h-8 bg-white/60 dark:bg-white/10 border border-black/10 dark:border-white/15 rounded-lg flex items-center justify-center backdrop-blur-xl">
             <Network className="w-5 h-5 text-primary" />
           </div>
-          <span className="text-lg font-light tracking-[0.18em] text-foreground">THE HUB</span>
+          <span className="text-lg font-light tracking-[0.18em] text-foreground">VOICE.HUB</span>
         </div>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
@@ -63,13 +63,6 @@ function Slide1({ t }: { t: any }) {
 
   const springScale = useSpring(scale, { stiffness: 80, damping: 25 });
   const springOpacity = useSpring(opacity, { stiffness: 80, damping: 25 });
-  const phrases = [
-    "The Future of Dubbing.",
-    "O Futuro da Dublagem.",
-    "GRAVAR. SALVAR. ENVIAR.",
-    "Fluxo Fácil de Gravação Remota.",
-    "THE HUB",
-  ];
 
   return (
     <motion.section
@@ -90,12 +83,11 @@ function Slide1({ t }: { t: any }) {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
         >
-          <TypewriterHeadline phrases={phrases} />
+          <h1 className="text-6xl md:text-9xl font-semibold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/55">
+            {t.landing.hero.title}
+          </h1>
           <p className="text-lg md:text-3xl text-muted-foreground font-medium max-w-3xl mx-auto mb-12 leading-relaxed tracking-tight">
             {t.landing.hero.subtitle}
-          </p>
-          <p className="text-sm md:text-xl text-primary font-semibold max-w-3xl mx-auto mb-8 tracking-wide">
-            {t.landing.trinity.builder.desc}
           </p>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -112,54 +104,6 @@ function Slide1({ t }: { t: any }) {
         </motion.div>
       </div>
     </motion.section>
-  );
-}
-
-function TypewriterHeadline({ phrases }: { phrases: string[] }) {
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  const [displayed, setDisplayed] = useState("");
-  const [phase, setPhase] = useState<"typing" | "holding" | "deleting" | "transition">("typing");
-  const full = phrases[phraseIndex] || "";
-  const longest = phrases.reduce((acc, cur) => (cur.length > acc.length ? cur : acc), "");
-
-  useEffect(() => {
-    if (phase === "holding") {
-      const t = setTimeout(() => setPhase("deleting"), 3000);
-      return () => clearTimeout(t);
-    }
-    if (phase === "transition") {
-      const t = setTimeout(() => {
-        setPhraseIndex((p) => (p + 1) % phrases.length);
-        setPhase("typing");
-      }, 1000);
-      return () => clearTimeout(t);
-    }
-
-    const speed = phase === "typing" ? 45 : 30;
-    const t = setTimeout(() => {
-      if (phase === "typing") {
-        const next = full.slice(0, displayed.length + 1);
-        setDisplayed(next);
-        if (next === full) setPhase("holding");
-      } else if (phase === "deleting") {
-        const next = displayed.slice(0, Math.max(0, displayed.length - 1));
-        setDisplayed(next);
-        if (!next.length) setPhase("transition");
-      }
-    }, speed);
-    return () => clearTimeout(t);
-  }, [displayed, full, phase, phrases.length]);
-
-  return (
-    <h1 className="text-6xl md:text-9xl font-semibold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/55">
-      <span className="relative inline-block">
-        <span aria-hidden className="invisible">{longest}</span>
-        <span className="absolute left-0 top-0 whitespace-nowrap">
-          {displayed}
-          <span className="inline-block w-[0.08em] h-[1em] ml-[0.05em] align-[-0.12em] bg-foreground/70 animate-pulse" />
-        </span>
-      </span>
-    </h1>
   );
 }
 

@@ -4,19 +4,19 @@ export const theHubEn = {
   },
   landing: {
     hero: {
-      title: "The Future of Dubbing.",
-      subtitle: "O Futuro da Dublagem.",
-      cta: "GRAVAR. SALVAR. ENVIAR.",
+      title: "The Future of Dubbing. Reimagined.",
+      subtitle: "One Ecosystem. Three Pillars. Total Mastery.",
+      cta: "Explore the Ecosystem",
     },
     trinity: {
       builder: {
-        desc: "Fluxo Fácil de Gravação Remota.",
+        desc: "The Studio OS. Orchestrate remote direction and multi-tenant workflows from a single intelligent core.",
       },
       learn: {
-        desc: "Fluxo Fácil de Gravação Remota.",
+        desc: "The Academy. Elite training in acoustics and performance with a premium learning grid.",
       },
       adr: {
-        desc: "Fluxo Fácil de Gravação Remota.",
+        desc: "The Engine. Automated timeline snapping, smart mastering, and export-ready delivery.",
       },
     },
   },
@@ -28,19 +28,19 @@ export const theHubPt = {
   },
   landing: {
     hero: {
-      title: "The Future of Dubbing.",
-      subtitle: "O Futuro da Dublagem.",
-      cta: "GRAVAR. SALVAR. ENVIAR.",
+      title: "O Futuro da Dublagem. Reinventado.",
+      subtitle: "Um Ecossistema. Três Pilares. Domínio Total.",
+      cta: "Explorar o Ecossistema",
     },
     trinity: {
       builder: {
-        desc: "Fluxo Fácil de Gravação Remota.",
+        desc: "O Studio OS. Direção remota e workflows multi-tenant em um núcleo inteligente.",
       },
       learn: {
-        desc: "Fluxo Fácil de Gravação Remota.",
+        desc: "A Academia. Formação de elite em acústica e performance com um grid premium.",
       },
       adr: {
-        desc: "Fluxo Fácil de Gravação Remota.",
+        desc: "O Motor. Snap automático na timeline, mastering inteligente e entrega pronta para exportação.",
       },
     },
   },

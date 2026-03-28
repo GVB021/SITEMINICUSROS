@@ -16,7 +16,7 @@ export function MeshGradient() {
       <motion.div
         animate={{ x: [0, 40, 0], y: [0, -40, 0], scale: [1, 1.1, 1] }}
         transition={{ duration: 22, repeat: Infinity, repeatType: "reverse" }}
-        className="absolute -bottom-[20%] -left-[10%] w-[50%] h-[50%] bg-gradient-to-tr from-gray-50 to-transparent rounded-full blur-[100px] opacity-50 dark:from-blue-500/10"
+        className="absolute -bottom-[20%] -left-[10%] w-[50%] h-[50%] bg-gradient-to-tr from-gray-50 to-transparent rounded-full blur-[100px] opacity-50 dark:from-indigo-500/10"
       />
     </div>
   );

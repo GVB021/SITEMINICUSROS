@@ -21,7 +21,7 @@
 
     --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --primary-border: 221 83% 53%;
+    --primary-border: 217 56% 43%;
 
     --secondary: 0 0% 95%;
     --secondary-foreground: 0 0% 16%;
@@ -71,9 +71,9 @@
     --popover-foreground: 220 20% 95%;
     --popover-border: 223 16% 20%;
 
-    --primary: 221 83% 53%;
+    --primary: 214 88% 68%;
     --primary-foreground: 224 24% 10%;
-    --primary-border: 221 83% 53%;
+    --primary-border: 213 78% 66%;
 
     --secondary: 223 17% 16%;
     --secondary-foreground: 220 20% 92%;
@@ -93,7 +93,7 @@
 
     --border: 223 14% 21%;
     --input: 223 14% 21%;
-    --ring: 221 83% 53%;
+    --ring: 213 78% 66%;
 
     --radius: 0.75rem;
   }
@@ -109,7 +109,7 @@
   }
 
   .text-glow {
-    text-shadow: 0 0 20px rgba(245, 158, 11, 0.45);
+    text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
   }
 
   .custom-scrollbar::-webkit-scrollbar {

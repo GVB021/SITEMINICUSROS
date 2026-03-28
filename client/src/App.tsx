@@ -12,7 +12,6 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { initThemeMode } from "@/lib/theme-mode";
 import { ThemeProvider } from "next-themes";
 import { BackButton } from "@/components/nav/BackButton";
-import { RealtimeInvalidation } from "@/components/realtime/RealtimeInvalidation";
 
 const lazyWithRetry = <T extends ComponentType<any>>(importer: () => Promise<{ default: T }>) =>
   lazy(async () => {
@@ -201,7 +200,47 @@ function Router() {
           <Route path="/hub-dub/studio/:studioId/sessions/:sessionId/room">
             {params => (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full fixed inset-0 bg-background overflow-y-auto z-50">
-                <ProtectedRoute component={RecordingRoom} params={params} />
+                <ProtectedRoute component={RecordingRoom} requireStudio params={params} />
+              </motion.div>
+            )}
+          </Route>
+
+          <Route path="/hub-dub/studio/:studioId/notifications">
+            {params => (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+                <ProtectedRoute component={Notifications} requireStudio params={params} />
+              </motion.div>
+            )}
+          </Route>
+
+          <Route path="/hub-dub/studio/:studioId/takes">
+            {params => (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+                <ProtectedRoute component={Takes} requireStudio params={params} />
+              </motion.div>
+            )}
+          </Route>
+
+          <Route path="/hub-dub/studio/:studioId/admin">
+            {params => (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+                <ProtectedRoute component={StudioAdmin} requireStudio params={params} />
+              </motion.div>
+            )}
+          </Route>
+
+          <Route path="/hub-dub/studio/:studioId/staff">
+            {params => (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+                <ProtectedRoute component={Staff} requireStudio params={params} />
+              </motion.div>
+            )}
+          </Route>
+
+          <Route path="/hub-dub/studio/:studioId/members">
+            {params => (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+                <ProtectedRoute component={Members} requireStudio params={params} />
               </motion.div>
             )}
           </Route>
@@ -235,7 +274,6 @@ export default function App() {
             <WouterRouter hook={memoryHook} searchHook={memorySearchHook}>
               <Toaster />
               <BackButton />
-              <RealtimeInvalidation />
               <Router />
             </WouterRouter>
           </ErrorBoundary>
