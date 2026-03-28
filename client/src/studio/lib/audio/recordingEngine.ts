@@ -1,18 +1,20 @@
 import type { MicrophoneState } from "./microphoneManager";
 
-const SAMPLE_RATE = 48000;
-const BUFFER_SIZE = 4096;
+const MIN_BUFFER_SIZE = 512;
+const TARGET_BUFFER_SIZE = 512;
 
 export type RecordingStatus =
   | "idle"
   | "countdown"
   | "recording"
   | "recorded"
+  | "stopped"
   | "previewing";
 
 export interface RecordingResult {
   samples: Float32Array;
   durationSeconds: number;
+  sampleRate: number;
 }
 
 let workletNode: AudioWorkletNode | null = null;
@@ -20,14 +22,22 @@ let scriptProcessorNode: ScriptProcessorNode | null = null;
 let recordedChunks: Float32Array[] = [];
 let totalSamples = 0;
 
-export function startCapture(micState: MicrophoneState): void {
+export async function startCapture(micState: MicrophoneState): Promise<void> {
   recordedChunks = [];
   totalSamples = 0;
+  console.info("[AudioPipeline][Capture] start", {
+    captureMode: micState.captureMode,
+    contextState: micState.audioContext.state,
+    sampleRate: micState.audioContext.sampleRate,
+  });
 
   if (micState.audioContext.state === "suspended") {
-    micState.audioContext.resume().then(() => {
+    try {
+      await micState.audioContext.resume();
       console.log("[RecEngine] AudioContext resumed before capture");
-    });
+    } catch (e) {
+      console.warn("[RecEngine] Failed to resume AudioContext:", e);
+    }
   }
 
   // Use AudioWorklet if in high-fidelity mode and module is loaded
@@ -44,7 +54,7 @@ export function startCapture(micState: MicrophoneState): void {
       
       micState.gainNode.connect(workletNode);
       workletNode.connect(micState.audioContext.destination); // Keep alive
-      console.log("[RecEngine] AudioWorklet capture started (High-Fidelity)");
+      console.info("[AudioPipeline][Capture] worklet-started");
       return;
     } catch (e) {
       console.warn("[RecEngine] AudioWorklet failed, falling back to ScriptProcessor", e);
@@ -53,7 +63,7 @@ export function startCapture(micState: MicrophoneState): void {
 
   // Fallback / Standard capture
   scriptProcessorNode = micState.audioContext.createScriptProcessor(
-    BUFFER_SIZE,
+    Math.max(MIN_BUFFER_SIZE, TARGET_BUFFER_SIZE),
     1,
     1
   );
@@ -68,11 +78,17 @@ export function startCapture(micState: MicrophoneState): void {
 
   micState.gainNode.connect(scriptProcessorNode);
   scriptProcessorNode.connect(micState.audioContext.destination);
-  console.log("[RecEngine] ScriptProcessor capture started, sampleRate:", micState.audioContext.sampleRate);
+  console.info("[AudioPipeline][Capture] script-processor-started", {
+    sampleRate: micState.audioContext.sampleRate,
+    bufferSize: Math.max(MIN_BUFFER_SIZE, TARGET_BUFFER_SIZE),
+  });
 }
 
-export function stopCapture(micState: MicrophoneState): RecordingResult {
-  console.log("[RecEngine] Stopping capture...", { chunksCount: recordedChunks.length, totalSamples });
+export async function stopCapture(micState: MicrophoneState): Promise<RecordingResult> {
+  console.info("[AudioPipeline][Capture] stopping", {
+    chunksCount: recordedChunks.length,
+    totalSamples,
+  });
 
   if (workletNode) {
     try {
@@ -103,10 +119,15 @@ export function stopCapture(micState: MicrophoneState): RecordingResult {
   recordedChunks = [];
   totalSamples = 0;
 
-  const durationSeconds = samples.length / SAMPLE_RATE;
-  console.log("[RecEngine] Capture stopped:", { samplesLength: samples.length, durationSeconds });
+  const sampleRate = micState.audioContext.sampleRate || 48000;
+  const durationSeconds = samples.length / sampleRate;
+  console.info("[AudioPipeline][Capture] stopped", {
+    samplesLength: samples.length,
+    durationSeconds,
+    sampleRate,
+  });
 
-  return { samples, durationSeconds };
+  return { samples, durationSeconds, sampleRate };
 }
 
 export function createPreviewUrl(wavBlob: Blob): string {
@@ -122,14 +143,24 @@ export function playCountdownBeep(
   frequency: number = 880,
   duration: number = 0.12
 ): void {
-  const osc = audioContext.createOscillator();
-  const env = audioContext.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(frequency, audioContext.currentTime);
-  env.gain.setValueAtTime(0.3, audioContext.currentTime);
-  env.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
-  osc.connect(env);
-  env.connect(audioContext.destination);
-  osc.start();
-  osc.stop(audioContext.currentTime + duration);
+  // 🔒 CRITICAL FIX: Prevent crash when audioContext is invalid
+  if (!audioContext || audioContext.state === "closed") {
+    console.warn("[AudioEngine] Invalid AudioContext, skipping beep");
+    return;
+  }
+  
+  try {
+    const osc = audioContext.createOscillator();
+    const env = audioContext.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    env.gain.setValueAtTime(0.3, audioContext.currentTime);
+    env.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+    osc.connect(env);
+    env.connect(audioContext.destination);
+    osc.start();
+    osc.stop(audioContext.currentTime + duration);
+  } catch (error) {
+    console.warn("[AudioEngine] Failed to play beep:", error);
+  }
 }

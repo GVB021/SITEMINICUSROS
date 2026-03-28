@@ -1,8 +1,9 @@
 import { db } from "./db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, count, sql } from "drizzle-orm";
 import {
   studios,
   users,
+  studioProfiles,
   studioMemberships,
   userStudioRoles,
   productions,
@@ -39,6 +40,7 @@ import {
   insertStudioMembershipSchema,
   insertNotificationSchema,
 } from "@shared/schema";
+import { userProfiles } from "@shared/models/auth";
 import type { z } from "zod";
 
 type InsertStudio = z.infer<typeof insertStudioSchema>;
@@ -136,8 +138,13 @@ export interface IStorage {
   setUserStudioRoles(membershipId: string, roles: string[]): Promise<UserStudioRole[]>;
   verifyUserStudioAccess(userId: string, studioId: string): Promise<boolean>;
   getActiveStudiosPublic(): Promise<{ id: string; name: string }[]>;
-  getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number }>;
+  getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number; onlineUsers: number; takesToday: number }>;
   getPendingMembersForStudio(studioId: string): Promise<(StudioMembership & { user?: User })[]>;
+
+  getUserProfile(userId: string): Promise<any>;
+  upsertUserProfile(userId: string, patch: Record<string, any>): Promise<any>;
+  getStudioProfile(studioId: string): Promise<any>;
+  upsertStudioProfile(studioId: string, patch: Record<string, any>): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -154,6 +161,38 @@ export class DatabaseStorage implements IStorage {
   async updateUserStatus(id: string, status: string): Promise<User> {
     const [updated] = await db.update(users).set({ status }).where(eq(users.id, id)).returning();
     return updated;
+  }
+
+  async getUserProfile(userId: string): Promise<any> {
+    const [row] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
+    return row?.data || {};
+  }
+
+  async upsertUserProfile(userId: string, patch: Record<string, any>): Promise<any> {
+    const existing = await this.getUserProfile(userId);
+    const data = { ...(existing || {}), ...(patch || {}) };
+    const [row] = await db
+      .insert(userProfiles)
+      .values({ userId, data })
+      .onConflictDoUpdate({ target: userProfiles.userId, set: { data, updatedAt: new Date() } })
+      .returning();
+    return row?.data || data;
+  }
+
+  async getStudioProfile(studioId: string): Promise<any> {
+    const [row] = await db.select().from(studioProfiles).where(eq(studioProfiles.studioId, studioId));
+    return row?.data || {};
+  }
+
+  async upsertStudioProfile(studioId: string, patch: Record<string, any>): Promise<any> {
+    const existing = await this.getStudioProfile(studioId);
+    const data = { ...(existing || {}), ...(patch || {}) };
+    const [row] = await db
+      .insert(studioProfiles)
+      .values({ studioId, data })
+      .onConflictDoUpdate({ target: studioProfiles.studioId, set: { data, updatedAt: new Date() } })
+      .returning();
+    return row?.data || data;
   }
 
   async getStudios(): Promise<Studio[]> {
@@ -337,18 +376,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, data: Partial<User>): Promise<User> {
-    const { id: _id, createdAt: _c, ...rest } = data as any;
-    const [updated] = await db.update(users).set(rest).where(eq(users.id, id)).returning();
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = data as any;
+    const [updated] = await db.update(users).set({ ...rest, updatedAt: new Date() }).where(eq(users.id, id)).returning();
     return updated;
   }
 
   async deleteUser(id: string): Promise<void> {
+    // Primeiro removemos as roles e memberships para evitar erros de FK se ON DELETE CASCADE falhar por algum motivo
+    await db.delete(userStudioRoles).where(inArray(userStudioRoles.membershipId, 
+      db.select({ id: studioMemberships.id }).from(studioMemberships).where(eq(studioMemberships.userId, id))
+    ));
+    await db.delete(studioMemberships).where(eq(studioMemberships.userId, id));
     await db.delete(users).where(eq(users.id, id));
   }
 
   async updateStudio(id: string, data: Partial<Studio>): Promise<Studio> {
-    const { id: _id, createdAt: _c, ...rest } = data as any;
-    const [updated] = await db.update(studios).set(rest).where(eq(studios.id, id)).returning();
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = data as any;
+    const [updated] = await db.update(studios).set({ ...rest, updatedAt: new Date() }).where(eq(studios.id, id)).returning();
     return updated;
   }
 
@@ -369,7 +413,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSession(id: string, data: Partial<Pick<Session, "title" | "status" | "scheduledAt" | "durationMinutes">>): Promise<Session> {
-    const [updated] = await db.update(sessions).set(data).where(eq(sessions.id, id)).returning();
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = data as any;
+    const [updated] = await db.update(sessions).set({ ...rest, updatedAt: new Date() }).where(eq(sessions.id, id)).returning();
     return updated;
   }
 
@@ -400,7 +445,7 @@ export class DatabaseStorage implements IStorage {
         aiRecommended: takes.aiRecommended,
         createdAt: takes.createdAt,
         characterName: characters.name,
-        voiceActorName: users.displayName,
+        voiceActorName: sql<string>`COALESCE(NULLIF(${takes.voiceActorName}, ''), ${users.displayName})`,
         sessionTitle: sessions.title,
         productionId: sessions.productionId,
         productionName: productions.name,
@@ -463,31 +508,67 @@ export class DatabaseStorage implements IStorage {
   async getStudioAdmins(studioId: string): Promise<User[]> {
     const memberships = await db.select().from(studioMemberships)
       .where(and(eq(studioMemberships.studioId, studioId), eq(studioMemberships.status, "approved")));
-    const adminUsers: User[] = [];
-    for (const m of memberships) {
-      const roles = await db.select({ role: userStudioRoles.role })
-        .from(userStudioRoles)
-        .where(eq(userStudioRoles.membershipId, m.id));
-      const isAdmin = roles.some(r => r.role === "studio_admin") || m.role === "studio_admin";
-      if (isAdmin) {
-        const [user] = await db.select().from(users).where(eq(users.id, m.userId));
-        if (user) adminUsers.push(user);
-      }
+    if (memberships.length === 0) return [];
+
+    const membershipIds = memberships.map((m) => m.id);
+    const roles = await db
+      .select({ membershipId: userStudioRoles.membershipId, role: userStudioRoles.role })
+      .from(userStudioRoles)
+      .where(inArray(userStudioRoles.membershipId, membershipIds));
+
+    const roleMap = new Map<string, Set<string>>();
+    for (const row of roles) {
+      if (!roleMap.has(row.membershipId)) roleMap.set(row.membershipId, new Set<string>());
+      roleMap.get(row.membershipId)!.add(row.role);
     }
-    return adminUsers;
+
+    const adminUserIds = Array.from(
+      new Set(
+        memberships
+          .filter((m) => m.role === "studio_admin" || roleMap.get(m.id)?.has("studio_admin"))
+          .map((m) => m.userId),
+      ),
+    );
+
+    if (adminUserIds.length === 0) return [];
+    return await db.select().from(users).where(inArray(users.id, adminUserIds));
   }
 
   async getPendingUsersWithStudioInfo(): Promise<any[]> {
     const pendingUsersList = await db.select().from(users).where(eq(users.status, "pending"));
-    const result = await Promise.all(pendingUsersList.map(async (u) => {
-      const memberships = await db.select().from(studioMemberships).where(eq(studioMemberships.userId, u.id));
-      const studioInfo = await Promise.all(memberships.map(async (m) => {
-        const [studio] = await db.select().from(studios).where(eq(studios.id, m.studioId));
-        return { membershipId: m.id, studioId: m.studioId, studioName: studio?.name || "Desconhecido", membershipStatus: m.status };
-      }));
-      return { ...u, studioMemberships: studioInfo };
-    }));
-    return result;
+    if (pendingUsersList.length === 0) return [];
+
+    const userIds = pendingUsersList.map((u) => u.id);
+    const memberships = await db
+      .select()
+      .from(studioMemberships)
+      .where(inArray(studioMemberships.userId, userIds));
+
+    const studioIds = Array.from(new Set(memberships.map((m) => m.studioId)));
+    const studioRows = studioIds.length
+      ? await db.select({ id: studios.id, name: studios.name }).from(studios).where(inArray(studios.id, studioIds))
+      : [];
+    const studioNameById = new Map(studioRows.map((s) => [s.id, s.name]));
+
+    const membershipsByUser = new Map<string, typeof memberships>();
+    for (const membership of memberships) {
+      const list = membershipsByUser.get(membership.userId) || [];
+      list.push(membership);
+      membershipsByUser.set(membership.userId, list);
+    }
+
+    return pendingUsersList.map((u) => {
+      const userMemberships = membershipsByUser.get(u.id) || [];
+      return {
+        ...u,
+        studioMemberships: userMemberships.map((m) => ({
+          membershipId: m.id,
+          studioId: m.studioId,
+          studioName: studioNameById.get(m.studioId) || "Desconhecido",
+          membershipStatus: m.status,
+        })),
+      };
+    });
   }
 
   async getStudioMemberships(studioId: string): Promise<(StudioMembership & { user?: User })[]> {
@@ -613,18 +694,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(studios.isActive, true));
   }
 
-  async getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number }> {
-    const allMemberships = await db.select().from(studioMemberships).where(eq(studioMemberships.studioId, studioId));
-    const membersCount = allMemberships.filter(m => m.status === "approved").length;
-    const pendingCount = allMemberships.filter(m => m.status === "pending").length;
-    const prods = await db.select().from(productions).where(eq(productions.studioId, studioId));
-    const sess = await db.select().from(sessions).where(eq(sessions.studioId, studioId));
-    let takesCount = 0;
-    for (const s of sess) {
-      const t = await db.select().from(takes).where(eq(takes.sessionId, s.id));
-      takesCount += t.length;
-    }
-    return { members: membersCount, productions: prods.length, sessions: sess.length, takes: takesCount, pendingMembers: pendingCount };
+  async getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number; onlineUsers: number; takesToday: number }> {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [membershipsResult, prodsResult, sessResult, takesResult, onlineResult, todayResult] = await Promise.all([
+      db.select({ status: studioMemberships.status }).from(studioMemberships).where(eq(studioMemberships.studioId, studioId)),
+      db.select({ cnt: count() }).from(productions).where(eq(productions.studioId, studioId)),
+      db.select({ cnt: count() }).from(sessions).where(eq(sessions.studioId, studioId)),
+      db.select({ cnt: count() }).from(takes)
+        .innerJoin(sessions, eq(takes.sessionId, sessions.id))
+        .where(eq(sessions.studioId, studioId)),
+      db.selectDistinct({ userId: sessionParticipants.userId }).from(sessionParticipants)
+        .innerJoin(sessions, eq(sessionParticipants.sessionId, sessions.id))
+        .where(and(eq(sessions.studioId, studioId), eq(sessions.status, "in_progress"))),
+      db.select({ cnt: count() }).from(takes)
+        .innerJoin(sessions, eq(takes.sessionId, sessions.id))
+        .where(and(eq(sessions.studioId, studioId), sql`${takes.createdAt} >= ${startOfToday}`)),
+    ]);
+    const membersCount = membershipsResult.filter(m => m.status === "approved").length;
+    const pendingCount = membershipsResult.filter(m => m.status === "pending").length;
+    return {
+      members: membersCount,
+      productions: Number(prodsResult[0]?.cnt ?? 0),
+      sessions: Number(sessResult[0]?.cnt ?? 0),
+      takes: Number(takesResult[0]?.cnt ?? 0),
+      pendingMembers: pendingCount,
+      onlineUsers: onlineResult.length,
+      takesToday: Number(todayResult[0]?.cnt ?? 0),
+    };
   }
 
   async getPendingMembersForStudio(studioId: string): Promise<(StudioMembership & { user?: User })[]> {
@@ -636,6 +734,12 @@ export class DatabaseStorage implements IStorage {
       return { ...m, user };
     }));
     return result;
+  }
+
+  async getCharacterAssignments(characterId: string): Promise<SessionParticipant[]> {
+    // Filter participants by characterId in memory since it's not a direct column
+    const allParticipants = await db.select().from(sessionParticipants);
+    return allParticipants.filter(p => (p as any).characterId === characterId);
   }
 }
 

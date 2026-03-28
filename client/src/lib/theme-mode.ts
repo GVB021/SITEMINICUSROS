@@ -1,35 +1,47 @@
-export type ThemeMode = "light" | "dark";
+const THEME_STORAGE_KEY = "vhub_theme_preference";
 
-const storageKey = "vhub-theme";
+export type Theme = "light" | "dark" | "system";
 
-export function getThemeModeFromDom(): ThemeMode {
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+export function getTheme(): Theme {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "dark" || stored === "light") return stored;
+  } catch {}
+  return "light";
 }
 
-export function setThemeMode(mode: ThemeMode) {
-  document.documentElement.classList.toggle("dark", mode === "dark");
-  document.documentElement.style.colorScheme = mode;
-  try {
-    window.localStorage.setItem(storageKey, mode);
-  } catch {
+export function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  if (theme === "dark") {
+    root.classList.add("dark");
+    root.style.colorScheme = "dark";
+  } else {
+    root.classList.remove("dark");
+    root.style.colorScheme = "light";
   }
+  try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch {}
 }
 
 export function initThemeMode() {
-  let stored: string | null = null;
-  try {
-    stored = window.localStorage.getItem(storageKey);
-  } catch {
-  }
-  const systemPrefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-  const mode: ThemeMode = stored === "light" || stored === "dark" ? stored : systemPrefersDark ? "dark" : "light";
-  document.documentElement.classList.toggle("dark", mode === "dark");
-  document.documentElement.style.colorScheme = mode;
+  applyTheme(getTheme());
+
+  // Re-apply theme on navigation
+  const originalPushState = window.history.pushState;
+  window.history.pushState = function(...args) {
+    originalPushState.apply(this, args);
+    applyTheme(getTheme());
+  };
+
+  const originalReplaceState = window.history.replaceState;
+  window.history.replaceState = function(...args) {
+    originalReplaceState.apply(this, args);
+    applyTheme(getTheme());
+  };
+
+  window.addEventListener("popstate", () => applyTheme(getTheme()));
 }
 
-export function toggleThemeMode(): ThemeMode {
-  const next: ThemeMode = getThemeModeFromDom() === "dark" ? "light" : "dark";
-  setThemeMode(next);
-  return next;
+export function toggleTheme(): Theme {
+  const current = getTheme();
+  return current === "light" ? "dark" : "light";
 }
-

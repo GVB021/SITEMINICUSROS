@@ -7,7 +7,7 @@ import {
   LogOut, ChevronRight, Trash2, Pencil, Plus, RotateCcw,
   CheckCircle2, AlertCircle, Save, Search, RefreshCw,
   Eye, EyeOff, Activity, Database, BadgeCheck, XCircle,
-  UserCog, ToggleLeft, ToggleRight, Star
+  UserCog, ToggleLeft, ToggleRight, Star, Download
 } from "lucide-react";
 import { Button } from "@studio/components/ui/button";
 import { Input } from "@studio/components/ui/input";
@@ -111,11 +111,11 @@ function OverviewSection() {
       <div>
         <h2 className="text-xl font-semibold mb-4">Visao Geral do Sistema</h2>
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <StatCard label="Usuarios" value={isLoading ? "—" : stats?.users ?? 0} icon={Users} color="text-blue-400" />
-          <StatCard label="Pendentes" value={isLoading ? "—" : stats?.pendingUsers ?? 0} icon={AlertCircle} color="text-amber-400" />
+          <StatCard label="Usuarios" value={isLoading ? "—" : stats?.users ?? 0} icon={Users} color="text-primary" />
+          <StatCard label="Pendentes" value={isLoading ? "—" : stats?.pendingUsers ?? 0} icon={AlertCircle} color="text-blue-400" />
           <StatCard label="Estudios" value={isLoading ? "—" : stats?.studios ?? 0} icon={Building2} color="text-violet-400" />
           <StatCard label="Producoes" value={isLoading ? "—" : stats?.productions ?? 0} icon={Film} color="text-emerald-400" />
-          <StatCard label="Sessoes" value={isLoading ? "—" : stats?.sessions ?? 0} icon={Calendar} color="text-cyan-400" />
+          <StatCard label="Sessoes" value={isLoading ? "—" : stats?.sessions ?? 0} icon={Calendar} color="text-primary" />
           <StatCard label="Takes" value={isLoading ? "—" : stats?.takes ?? 0} icon={Mic2} color="text-rose-400" />
         </div>
       </div>
@@ -199,7 +199,7 @@ function PendingUsersSection() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-xl font-semibold flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-amber-400" />
+          <AlertCircle className="h-5 w-5 text-blue-400" />
           Usuarios Pendentes
           {pendingUsers.length > 0 && (
             <Badge variant="destructive" data-testid="badge-pending-count">{pendingUsers.length}</Badge>
@@ -342,6 +342,7 @@ function UsersSection() {
   const [assignUser, setAssignUser] = useState<any | null>(null);
   const [assignStudioId, setAssignStudioId] = useState("");
   const [assignRoles, setAssignRoles] = useState<string[]>([]);
+  const [activityUser, setActivityUser] = useState<any | null>(null);
 
   const { data: usersList = [], isLoading } = useQuery({
     queryKey: ["/api/admin/users"],
@@ -355,16 +356,22 @@ function UsersSection() {
     refetchInterval: 5000,
   });
 
+  const { data: activityLogs = [] } = useQuery({
+    queryKey: ["/api/admin/users", activityUser?.id, "activity"],
+    enabled: Boolean(activityUser?.id),
+    queryFn: () => authFetch(`/api/admin/users/${activityUser.id}/activity`) as Promise<any[]>,
+  });
+
   const changeRoleMut = useMutation({
     mutationFn: ({ id, role }: { id: string; role: string }) =>
-      authFetch(`/api/admin/users/${id}/change-role`, { method: "POST", body: JSON.stringify({ role }) }),
+      authFetch(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ role }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/users"] }); qc.invalidateQueries({ queryKey: ["/api/admin/stats"] }); toast({ title: "Papel alterado" }); },
     onError: (e: any) => toast({ title: e.message || "Falha ao alterar papel", variant: "destructive" }),
   });
 
   const changeStatusMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      authFetch(`/api/admin/users/${id}/change-status`, { method: "POST", body: JSON.stringify({ status }) }),
+      authFetch(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/users"] }); qc.invalidateQueries({ queryKey: ["/api/admin/stats"] }); qc.invalidateQueries({ queryKey: ["/api/admin/pending-users"] }); toast({ title: "Status alterado" }); },
     onError: (e: any) => toast({ title: e.message || "Falha ao alterar status", variant: "destructive" }),
   });
@@ -405,13 +412,22 @@ function UsersSection() {
     u.displayName?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const exportUsersCsv = () => {
+    window.open("/api/admin/users/export", "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-xl font-semibold">Gerenciamento de Usuarios</h2>
-        <Button size="sm" onClick={() => setCreateOpen(true)} data-testid="button-create-user">
-          <Plus className="h-4 w-4 mr-2" /> Criar Usuario
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={exportUsersCsv} data-testid="button-export-users">
+            <Download className="h-4 w-4 mr-2" /> Exportar CSV
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)} data-testid="button-create-user">
+            <Plus className="h-4 w-4 mr-2" /> Criar Usuario
+          </Button>
+        </div>
       </div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -431,7 +447,9 @@ function UsersSection() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(user => (
+                {filtered.map(user => {
+                  const isMaster = String(user.email || "").toLowerCase() === "borbaggabriel@gmail.com";
+                  return (
                   <tr key={user.id} className="border-b border-white/6 last:border-0 hover:bg-white/3" data-testid={`row-user-${user.id}`}>
                     <td className="p-3">
                       <div className="font-medium">{user.displayName || user.fullName || "—"}</div>
@@ -441,6 +459,7 @@ function UsersSection() {
                       <Select
                         value={user.status}
                         onValueChange={v => changeStatusMut.mutate({ id: user.id, status: v })}
+                        disabled={isMaster}
                       >
                         <SelectTrigger className="h-7 w-28 text-xs" data-testid={`select-status-${user.id}`}>
                           <SelectValue />
@@ -456,6 +475,7 @@ function UsersSection() {
                       <Select
                         value={user.role}
                         onValueChange={v => changeRoleMut.mutate({ id: user.id, role: v })}
+                        disabled={isMaster}
                       >
                         <SelectTrigger className="h-7 w-36 text-xs" data-testid={`select-role-${user.id}`}>
                           <SelectValue />
@@ -481,13 +501,16 @@ function UsersSection() {
                         <Button size="icon" variant="ghost" title="Redefinir senha" onClick={() => setResetUser(user)} data-testid={`button-reset-pw-${user.id}`}>
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="icon" variant="ghost" title="Excluir" className="text-destructive hover:text-destructive" onClick={() => setDeleteConfirm(user)} data-testid={`button-delete-user-${user.id}`}>
+                        <Button size="icon" variant="ghost" title="Atividades" onClick={() => setActivityUser(user)} data-testid={`button-activity-user-${user.id}`}>
+                          <Activity className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Excluir" className="text-destructive hover:text-destructive" onClick={() => setDeleteConfirm(user)} disabled={isMaster} data-testid={`button-delete-user-${user.id}`}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
                 {filtered.length === 0 && (
                   <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum usuario encontrado</td></tr>
                 )}
@@ -657,6 +680,25 @@ function UsersSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!activityUser} onOpenChange={() => setActivityUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Historico de Atividades</DialogTitle>
+            <DialogDescription>{activityUser?.email}</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 overflow-y-auto space-y-2">
+            {!activityLogs.length && <div className="text-sm text-muted-foreground">Sem atividades registradas.</div>}
+            {activityLogs.map((log: any) => (
+              <div key={log.id} className="rounded-md border border-border p-2.5 text-xs space-y-1">
+                <div className="font-medium">{log.action}</div>
+                <div className="text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</div>
+                <div className="text-muted-foreground break-words">{log.details}</div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -664,6 +706,7 @@ function UsersSection() {
 function StudiosSection() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
   const [editStudio, setEditStudio] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ name: "", slug: "", isActive: true });
@@ -766,6 +809,15 @@ function StudiosSection() {
                         </Button>
                         <Button size="icon" variant="ghost" title="Editar Estudio" onClick={() => { setEditStudio(studio); setEditForm({ name: studio.name, slug: studio.slug, isActive: studio.isActive }); }} data-testid={`button-edit-studio-${studio.id}`}>
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Gerenciar Estudio"
+                          onClick={() => setLocation(`/hub-dub/admin/studios/${studio.id}/management`)}
+                          data-testid={`button-study-manager-${studio.id}`}
+                        >
+                          <UserCog className="h-4 w-4" />
                         </Button>
                         <Button size="icon" variant="ghost" title="Excluir Estudio" className="text-destructive hover:bg-destructive/10" onClick={() => setDeleteConfirm(studio)} data-testid={`button-delete-studio-${studio.id}`}>
                           <Trash2 className="h-4 w-4" />
@@ -1043,6 +1095,7 @@ function SessionsSection() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ studioId: "", productionId: "", title: "", scheduledAt: "", durationMinutes: "60" });
   const [search, setSearch] = useState("");
+  const [forceLogoutUserId, setForceLogoutUserId] = useState<string>("");
 
   const { data: sessData = [], isLoading } = useQuery({
     queryKey: ["/api/admin/sessions"],
@@ -1058,6 +1111,18 @@ function SessionsSection() {
   const { data: prodsList = [] } = useQuery({
     queryKey: ["/api/admin/productions"],
     queryFn: () => authFetch("/api/admin/productions") as Promise<any[]>,
+  });
+
+  const { data: activeSessionsByUser = [] } = useQuery({
+    queryKey: ["/api/admin/sessions/active-by-user"],
+    queryFn: () => authFetch("/api/admin/sessions/active-by-user") as Promise<any[]>,
+    refetchInterval: 5000,
+  });
+
+  const { data: authSessionsSummary = [] } = useQuery({
+    queryKey: ["/api/admin/auth-sessions/users"],
+    queryFn: () => authFetch("/api/admin/auth-sessions/users") as Promise<any[]>,
+    refetchInterval: 5000,
   });
 
   const deleteMut = useMutation({
@@ -1078,6 +1143,28 @@ function SessionsSection() {
     onError: (e: any) => toast({ title: e.message || "Falha ao criar", variant: "destructive" }),
   });
 
+  const cleanupSessionsMut = useMutation({
+    mutationFn: () => authFetch("/api/admin/sessions/cleanup-expired", { method: "POST" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/sessions"] }); toast({ title: "Limpeza de sessoes concluida" }); },
+    onError: (e: any) => toast({ title: e.message || "Falha ao limpar sessoes", variant: "destructive" }),
+  });
+
+  const cleanupAuthMut = useMutation({
+    mutationFn: () => authFetch("/api/admin/auth-sessions/cleanup-expired", { method: "POST" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/auth-sessions/users"] }); toast({ title: "Sessoes web expiradas removidas" }); },
+    onError: (e: any) => toast({ title: e.message || "Falha ao limpar sessoes web", variant: "destructive" }),
+  });
+
+  const forceLogoutMut = useMutation({
+    mutationFn: (userId: string) => authFetch(`/api/admin/auth-sessions/force-logout-user/${userId}`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/auth-sessions/users"] });
+      toast({ title: "Logout forcado aplicado" });
+      setForceLogoutUserId("");
+    },
+    onError: (e: any) => toast({ title: e.message || "Falha no logout forcado", variant: "destructive" }),
+  });
+
   const filtered = sessData.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
 
   const filteredProds = createForm.studioId
@@ -1095,9 +1182,61 @@ function SessionsSection() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gerenciamento de Sessoes</h2>
-        <Button onClick={() => setCreateOpen(true)} data-testid="button-create-session">
-          <Plus className="h-4 w-4 mr-1.5" /> Nova Sessao
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => cleanupSessionsMut.mutate()} disabled={cleanupSessionsMut.isPending} data-testid="button-cleanup-expired-sessions">
+            <RefreshCw className="h-4 w-4 mr-1.5" /> Limpar Expiradas
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} data-testid="button-create-session">
+            <Plus className="h-4 w-4 mr-1.5" /> Nova Sessao
+          </Button>
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="vhub-card p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Sessoes Ativas por Usuario</h3>
+            <Badge variant="outline">{activeSessionsByUser.length}</Badge>
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-2">
+            {activeSessionsByUser.length === 0 && <div className="text-xs text-muted-foreground">Sem usuarios com sessao ativa.</div>}
+            {activeSessionsByUser.map((item: any) => (
+              <div key={item.userId} className="rounded-md border border-border p-2">
+                <div className="text-xs font-medium">{item.userDisplayName || item.userEmail || item.userId}</div>
+                <div className="text-[11px] text-muted-foreground">{item.sessions.length} sessao(oes) ativa(s)</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="vhub-card p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Sessoes Web Ativas</h3>
+            <Button size="sm" variant="outline" onClick={() => cleanupAuthMut.mutate()} disabled={cleanupAuthMut.isPending} data-testid="button-cleanup-auth-sessions">
+              Limpar Expiradas
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <Select value={forceLogoutUserId} onValueChange={setForceLogoutUserId}>
+              <SelectTrigger data-testid="select-force-logout-user"><SelectValue placeholder="Selecionar usuario para logout forcado" /></SelectTrigger>
+              <SelectContent>
+                {authSessionsSummary.map((item: any) => (
+                  <SelectItem key={item.userId} value={item.userId}>
+                    {(item.userDisplayName || item.userEmail || item.userId) + ` (${item.sessions})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              className="w-full"
+              variant="destructive"
+              disabled={!forceLogoutUserId || forceLogoutMut.isPending}
+              onClick={() => forceLogoutMut.mutate(forceLogoutUserId)}
+              data-testid="button-force-logout-user"
+            >
+              Logout Forcado do Usuario
+            </Button>
+          </div>
+        </div>
       </div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1121,6 +1260,9 @@ function SessionsSection() {
                     <td className="p-3">
                       <div className="font-medium">{sess.title}</div>
                       <div className="text-xs text-muted-foreground">{sess.durationMinutes} min</div>
+                      <div className="text-xs text-muted-foreground md:hidden mt-0.5">
+                        {sess.scheduledAt ? new Date(sess.scheduledAt).toLocaleString() : "—"}
+                      </div>
                     </td>
                     <td className="p-3">
                       <Badge variant={statusColor(sess.status)}>{sess.status}</Badge>
@@ -1258,7 +1400,7 @@ function TakesSection() {
                     <td className="p-3 font-mono text-xs">{take.id.slice(0, 8)}…</td>
                     <td className="p-3">
                       {take.qualityScore !== null ? (
-                        <span className={`font-medium ${take.qualityScore >= 80 ? "text-emerald-400" : take.qualityScore >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                        <span className={`font-medium ${take.qualityScore >= 80 ? "text-emerald-400" : take.qualityScore >= 50 ? "text-blue-400" : "text-red-400"}`}>
                           {Math.round(take.qualityScore)}
                         </span>
                       ) : "—"}
@@ -1483,7 +1625,7 @@ function IntegrationsSection() {
             {storageStatus?.supabaseOk ? (
               <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
             ) : (
-              <AlertCircle className="h-5 w-5 text-amber-400 shrink-0" />
+              <AlertCircle className="h-5 w-5 text-blue-400 shrink-0" />
             )}
             <div className="min-w-0">
               <p className="text-sm font-medium">
@@ -1619,7 +1761,7 @@ export default function Admin() {
         <ShieldAlert className="w-12 h-12 text-destructive" />
         <h2 className="text-xl font-bold">Acesso Negado</h2>
         <p className="text-muted-foreground text-sm">Apenas proprietarios da plataforma podem acessar este painel.</p>
-        <Button onClick={() => setLocation("/studios")} variant="outline">Voltar aos Estudios</Button>
+        <Button onClick={() => setLocation("/hub-dub/studios")} variant="outline">Ir para Estudios</Button>
       </div>
     );
   }
@@ -1650,7 +1792,7 @@ export default function Admin() {
           {pendingCount > 0 && (
             <button
               onClick={() => setSection("pending")}
-              className="mt-2 w-full flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-500/12 text-amber-400 text-xs font-medium border border-amber-500/25"
+              className="mt-2 w-full flex items-center gap-2 px-2 py-1.5 rounded-md bg-blue-500/12 text-blue-400 text-xs font-medium border border-blue-500/25"
               data-testid="button-quick-pending"
             >
               <AlertCircle className="h-3.5 w-3.5" />
