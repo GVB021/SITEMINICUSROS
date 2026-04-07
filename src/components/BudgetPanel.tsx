@@ -1,4 +1,5 @@
-import type { ConciergeResponse, TripConfig, ItineraryItem } from '../types';
+import { useState } from 'react';
+import type { ConciergeResponse, TripConfig, ItineraryItem, PeriodDetail } from '../types';
 import type { BudgetPlan } from '../api';
 
 interface Props {
@@ -11,7 +12,66 @@ interface Props {
   onReoptimize: () => void;
 }
 
+function PeriodDetailPanel({ detail }: { detail: PeriodDetail }) {
+  const hasDishes = (detail.pratos?.length ?? 0) > 0;
+  const hasTransport = detail.distancia_hotel || detail.tarifa_taxi != null;
+  if (!hasDishes && !hasTransport) return null;
+  return (
+    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {hasDishes && (
+        <div>
+          <p style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 7 }}>
+            🍽 Pratos sugeridos
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {detail.pratos!.map((p, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                background: 'var(--bg-card)', borderRadius: 6, padding: '7px 10px',
+                border: '1px solid var(--border)',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 500 }}>{p.nome}</span>
+                  {p.descricao && (
+                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)', marginLeft: 6 }}>— {p.descricao}</span>
+                  )}
+                </div>
+                <span className="badge-gold" style={{ fontSize: 11.5, flexShrink: 0, marginLeft: 10 }}>
+                  R$ {p.preco.toLocaleString('pt-BR')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {hasTransport && (
+        <div style={{
+          display: 'flex', gap: 16, flexWrap: 'wrap',
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: '8px 10px',
+        }}>
+          {detail.distancia_hotel && (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              📍 <strong style={{ color: 'var(--text-secondary)' }}>{detail.distancia_hotel}</strong> do hotel
+            </span>
+          )}
+          {detail.tarifa_taxi != null && (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              🚕 Táxi aprox. <strong style={{ color: 'var(--text-secondary)' }}>R$ {detail.tarifa_taxi.toLocaleString('pt-BR')}</strong>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, onAddItem, addedIds, onReoptimize }: Props) {
+  const [expandedPeriodKey, setExpandedPeriodKey] = useState<string | null>(null);
+
+  const togglePeriod = (key: string) =>
+    setExpandedPeriodKey(prev => (prev === key ? null : key));
+
   const budget = config.budget!;
   const breakdown = budgetPlan?.resumo_orcamento;
   const itinerary = budgetPlan?.roteiro_dia_a_dia ?? [];
@@ -320,32 +380,61 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
                   gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                   gap: 12,
                 }}>
-                  {[
-                    { period: '🌅 Manhã', content: day.manha },
-                    { period: '☀️ Tarde', content: day.tarde },
-                    { period: '🌙 Noite', content: day.noite },
-                  ].filter(p => p.content).map((period) => (
-                    <div key={period.period} style={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      padding: '12px 14px',
-                    }}>
-                      <p style={{
-                        fontSize: 11,
-                        color: 'var(--gold)',
-                        fontWeight: 500,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        marginBottom: 6,
-                      }}>
-                        {period.period}
-                      </p>
-                      <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                        {period.content}
-                      </p>
-                    </div>
-                  ))}
+                  {([
+                    { period: '🌅 Manhã',  content: day.manha, detalhe: day.manha_detalhe, key: `${idx}-manha`  },
+                    { period: '☀️ Tarde',  content: day.tarde, detalhe: day.tarde_detalhe, key: `${idx}-tarde`  },
+                    { period: '🌙 Noite',  content: day.noite, detalhe: day.noite_detalhe, key: `${idx}-noite`  },
+                  ] as const).filter(p => p.content).map((p) => {
+                    const hasDetail = p.detalhe && (
+                      (p.detalhe.pratos?.length ?? 0) > 0 ||
+                      p.detalhe.distancia_hotel ||
+                      p.detalhe.tarifa_taxi != null
+                    );
+                    const isExpanded = expandedPeriodKey === p.key;
+                    return (
+                      <div
+                        key={p.key}
+                        style={{
+                          background: isExpanded ? 'var(--bg-card)' : 'var(--bg-surface)',
+                          border: `1px solid ${isExpanded ? 'var(--gold-border)' : 'var(--border)'}`,
+                          borderRadius: 8,
+                          padding: '12px 14px',
+                          transition: 'background 0.15s, border-color 0.15s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <p style={{
+                            fontSize: 11,
+                            color: 'var(--gold)',
+                            fontWeight: 500,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                          }}>
+                            {p.period}
+                          </p>
+                          {hasDetail && (
+                            <button
+                              onClick={() => togglePeriod(p.key)}
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                fontSize: 11, color: isExpanded ? 'var(--gold)' : 'var(--text-muted)',
+                                fontWeight: 600, padding: '1px 4px',
+                                transition: 'color 0.15s',
+                              }}
+                            >
+                              {isExpanded ? '▲ Fechar' : '▼ Detalhes'}
+                            </button>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                          {p.content}
+                        </p>
+                        {isExpanded && p.detalhe && (
+                          <PeriodDetailPanel detail={p.detalhe} />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

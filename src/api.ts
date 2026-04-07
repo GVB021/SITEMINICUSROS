@@ -356,7 +356,12 @@ Monte o melhor roteiro completo dentro do orçamento. Selecione 1 hospedagem, re
 Campos obrigatórios:
 - hospedagem_sugerida: nome exato da hospedagem escolhida (string)
 - restaurantes_sugeridos: array de nomes escolhidos
-- roteiro_dia_a_dia[]: dia(number), data, manha, tarde, noite, custo_estimado(number)
+- roteiro_dia_a_dia[]: para cada dia inclua:
+  - dia(number), data(string), manha(string), tarde(string), noite(string), custo_estimado(number)
+  - manha_detalhe, tarde_detalhe, noite_detalhe: objetos opcionais com:
+    - pratos: array SOMENTE se o período for uma refeição — até 3 pratos [{nome, descricao(≤8 palavras), preco(number)}]
+    - distancia_hotel: distância em km da hospedagem até o local (string, ex: "2.3 km") — omita se for no hotel
+    - tarifa_taxi: valor estimado em R$ de táxi até o local (number) — omita se for no hotel
 - resumo_orcamento{}: hospedagem, alimentacao, passeios, transporte, eventos, experiencias, total (todos numbers, total ≤ R$${config.budget})
 - dica_economia: dica rápida para economizar`;
 }

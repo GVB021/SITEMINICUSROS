@@ -96,6 +96,18 @@ export interface SpecialExperience {
   fonte_preco?: string | null;
 }
 
+export interface PeriodDish {
+  nome: string;
+  descricao?: string;
+  preco: number;
+}
+
+export interface PeriodDetail {
+  pratos?: PeriodDish[];
+  distancia_hotel?: string;
+  tarifa_taxi?: number;
+}
+
 export interface DayItinerary {
   dia: number;
   data: string;
@@ -103,6 +115,9 @@ export interface DayItinerary {
   tarde: string;
   noite: string;
   custo_estimado: number;
+  manha_detalhe?: PeriodDetail;
+  tarde_detalhe?: PeriodDetail;
+  noite_detalhe?: PeriodDetail;
 }
 
 export interface BudgetBreakdown {
