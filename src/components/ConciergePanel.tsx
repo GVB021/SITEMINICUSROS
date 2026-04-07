@@ -54,7 +54,6 @@ export default function ConciergePanel({
     const siteUrl = item.site_oficial && item.site_oficial !== 'null' && item.site_oficial.startsWith('http')
       ? item.site_oficial
       : null;
-    if (!siteUrl) return null;
     return extractPlaceDetails(item.nome, item.type, siteUrl, apiKeys, config.destination);
   }, [apiKeys, config.destination]);
 
@@ -348,13 +347,15 @@ export default function ConciergePanel({
         {activeTab === 'transporte' && (
           <CategorySection
             items={data.transporte?.map((t) => ({
-              id: `transp-${t.tipo}`,
+              id: `transp-${t.nome ?? t.tipo}`,
               type: 'transporte' as const,
-              nome: t.tipo,
+              nome: t.nome ?? t.tipo,
               preco: t.valor,
               descricao: t.descricao,
-              meta: '',
-              badge: `R$ ${t.valor.toLocaleString('pt-BR')}`,
+              meta: t.tipo,
+              badge: t.valor === 0 ? 'Gratuito' : `R$ ${t.valor.toLocaleString('pt-BR')}`,
+              site_oficial: t.site_oficial,
+              telefone: t.telefone,
             })) ?? []}
             onAdd={handleAdd}
             onViewDetails={handleViewDetails}

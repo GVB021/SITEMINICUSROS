@@ -90,11 +90,6 @@ export default function CategorySection({ items, onAdd, onViewDetails, addedIds,
   const [errorIds, setErrorIds] = useState<Set<string>>(new Set());
 
   const handleToggleDetail = async (item: CardItem) => {
-    if (!hasSiteOficial(item)) {
-      const q = encodeURIComponent(item.nome);
-      window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener,noreferrer');
-      return;
-    }
     if (expandedId === item.id) { setExpandedId(null); return; }
     setExpandedId(item.id);
     if (item.id in detailMap) return;
@@ -284,22 +279,20 @@ export default function CategorySection({ items, onAdd, onViewDetails, addedIds,
                   display: 'flex', gap: 8, paddingTop: 4,
                   borderTop: '1px solid var(--border)', marginTop: 4,
                 }}>
-                  {/* Details / Search button */}
+                  {/* Details button — always available */}
                   <button
                     onClick={() => handleToggleDetail(item)}
                     style={{
                       flex: 1,
                       padding: '9px 12px', borderRadius: 8,
-                      border: hasSiteOficial(item) ? '1px solid var(--gold-border)' : '1px solid var(--border)',
-                      background: expandedId === item.id
-                        ? 'var(--gold-dim)'
-                        : hasSiteOficial(item) ? 'rgba(201,169,110,0.06)' : 'rgba(255,255,255,0.03)',
-                      color: expandedId === item.id ? 'var(--gold)' : hasSiteOficial(item) ? 'var(--gold-light)' : 'var(--text-muted)',
+                      border: '1px solid var(--gold-border)',
+                      background: expandedId === item.id ? 'var(--gold-dim)' : 'rgba(201,169,110,0.06)',
+                      color: expandedId === item.id ? 'var(--gold)' : 'var(--gold-light)',
                       cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
                       transition: 'background 0.2s, color 0.2s',
                     }}
                   >
-                    {!hasSiteOficial(item) ? '🔍 Buscar' : expandedId === item.id ? '▲ Fechar' : '▼ Detalhes'}
+                    {expandedId === item.id ? '▲ Fechar' : '▼ Detalhes'}
                   </button>
 
                   {/* Add to itinerary */}
@@ -331,14 +324,17 @@ export default function CategorySection({ items, onAdd, onViewDetails, addedIds,
                   animation: 'fadeIn 0.2s ease',
                 }}>
                   {loadingIds.has(item.id) ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--text-muted)', fontSize: 13 }}>
-                      <div style={{
-                        width: 20, height: 20, borderRadius: '50%',
-                        border: '2px solid var(--border)', borderTop: '2px solid var(--gold)',
-                        animation: 'spin-slow 1s linear infinite',
-                        flexShrink: 0,
-                      }} />
-                      Carregando detalhes…
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--text-muted)', fontSize: 13, marginBottom: 4 }}>
+                        <div style={{
+                          width: 20, height: 20, borderRadius: '50%',
+                          border: '2px solid var(--border)', borderTop: '2px solid var(--gold)',
+                          animation: 'spin-slow 1s linear infinite',
+                          flexShrink: 0,
+                        }} />
+                        Carregando detalhes…
+                      </div>
+                      <div className="skeleton" style={{ height: 80, borderRadius: 10 }} />
                     </div>
                   ) : errorIds.has(item.id) ? (
                     <p style={{ color: 'var(--danger)', fontSize: 13 }}>
@@ -347,8 +343,84 @@ export default function CategorySection({ items, onAdd, onViewDetails, addedIds,
                   ) : (() => {
                     const d = detailMap[item.id];
                     if (!d) return <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem informações disponíveis.</p>;
+
+                    // Resolve contact fields — prefer detail data, fall back to card data
+                    const phone   = d.telefone   ?? item.telefone   ?? null;
+                    const address = d.endereco   ?? null;
+                    const siteUrl = d.site_oficial ?? item.site_oficial ?? null;
+                    const igUrl   = d.instagram_url ?? null;
+                    const mapsUrl = d.google_maps_url
+                      ?? `https://www.google.com/maps/search/${encodeURIComponent(item.nome)}+${encodeURIComponent(address ?? '')}`;
+
+                    const hasContact = phone || address || siteUrl || igUrl || mapsUrl;
+
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                        {/* ── Contact & Location block — always first ── */}
+                        {hasContact && (
+                          <div style={{
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 12,
+                            padding: '14px 16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 10,
+                          }}>
+                            <p style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: 0 }}>
+                              📌 Contato &amp; Localização
+                            </p>
+
+                            {address && (
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>📍</span>
+                                <span style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{address}</span>
+                              </div>
+                            )}
+
+                            {phone && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 14, flexShrink: 0 }}>📞</span>
+                                <a href={`tel:${phone.replace(/\D/g, '')}`}
+                                  style={{ fontSize: 13, color: 'var(--teal)', textDecoration: 'none', fontWeight: 500 }}>
+                                  {phone}
+                                </a>
+                              </div>
+                            )}
+
+                            {/* Links row */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
+                              {siteUrl && (
+                                <a href={siteUrl} target="_blank" rel="noopener noreferrer" style={linkChip}>
+                                  🌐 Site oficial
+                                </a>
+                              )}
+                              {igUrl && (
+                                <a href={igUrl} target="_blank" rel="noopener noreferrer" style={{ ...linkChip, borderColor: 'rgba(225,48,108,0.35)', color: '#e1306c' }}>
+                                  📷 Instagram
+                                </a>
+                              )}
+                              {mapsUrl && (
+                                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ ...linkChip, borderColor: 'rgba(66,133,244,0.35)', color: '#4285f4' }}>
+                                  🗺️ Google Maps
+                                </a>
+                              )}
+                            </div>
+
+                            {/* Disclaimer for Gemini knowledge fallback */}
+                            {d.source === 'knowledge' && (
+                              <p style={{
+                                fontSize: 11, color: 'var(--text-muted)',
+                                borderTop: '1px solid var(--border)',
+                                paddingTop: 8, margin: 0, lineHeight: 1.5,
+                              }}>
+                                ⚠️ Informações estimadas — confirme antes de visitar
+                              </p>
+                            )}
+                          </div>
+                        )}
+
                         {d.descricao_completa && (
                           <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.7 }}>{d.descricao_completa}</p>
                         )}
@@ -432,21 +504,12 @@ export default function CategorySection({ items, onAdd, onViewDetails, addedIds,
                         )}
 
                         {/* Schedule / Duration / How to get there */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-                          {d.horario && <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>🕐 <strong style={{ color: 'var(--text-secondary)' }}>{d.horario}</strong></span>}
-                          {d.duracao && <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>⏱ <strong style={{ color: 'var(--text-secondary)' }}>{d.duracao}</strong></span>}
-                          {d.endereco && <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>📍 <strong style={{ color: 'var(--text-secondary)' }}>{d.endereco}</strong></span>}
-                        </div>
-                        {d.como_chegar && (
-                          <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>🗺 <strong style={{ color: 'var(--text-secondary)' }}>Como chegar: </strong>{d.como_chegar}</p>
-                        )}
-
-                        {/* Site link */}
-                        {item.site_oficial && (
-                          <a href={item.site_oficial} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: 12.5, color: 'var(--teal)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                            🌐 Ver site oficial →
-                          </a>
+                        {(d.horario || d.duracao || d.como_chegar) && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {d.horario && <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>🕐 <strong style={{ color: 'var(--text-secondary)' }}>{d.horario}</strong></span>}
+                            {d.duracao && <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>⏱ <strong style={{ color: 'var(--text-secondary)' }}>{d.duracao}</strong></span>}
+                            {d.como_chegar && <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>🗺 <strong style={{ color: 'var(--text-secondary)' }}>Como chegar: </strong>{d.como_chegar}</span>}
+                          </div>
                         )}
                       </div>
                     );
@@ -460,3 +523,16 @@ export default function CategorySection({ items, onAdd, onViewDetails, addedIds,
     </div>
   );
 }
+
+/* ─── Styles ────────────────────────────────────────────────────────────── */
+const linkChip: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 5,
+  padding: '5px 12px',
+  borderRadius: 20,
+  border: '1px solid var(--gold-border)',
+  background: 'var(--bg-hover)',
+  color: 'var(--gold-light)',
+  fontSize: 12, fontWeight: 500,
+  textDecoration: 'none',
+  transition: 'opacity 0.15s',
+};

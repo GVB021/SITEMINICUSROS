@@ -68,7 +68,9 @@ CAMPOS POR ARRAY:
 - restaurantes[]: nome, cozinha, preco_por_pessoa(number), prato_estrela, horario, descricao, foto_url, site_oficial, telefone, rating
 - atracoes[]: nome, preco(number), duracao, perfil_ideal, descricao, foto_url, site_oficial, telefone, rating
 - eventos[]: nome, data, preco(number), local, descricao, foto_url, site_oficial, telefone
-- transporte[]: tipo, descricao, valor(number)
+- transporte[]: nome, tipo, descricao, valor(number), site_oficial, telefone
+  * Inclua locadoras de carros presentes no destino ou mais próximas (Movida, Localiza, Unidas, etc.) com site_oficial real e telefone real
+  * Inclua também opções de táxi/rideshare (Uber, 99) com site_oficial e telefone de central quando disponível
 - experiencias[]: nome, preco_por_pessoa(number), duracao, descricao, foto_url, site_oficial, telefone
 
 Campos raiz: destino, clima_estimado, descricao_destino, dica_concierge
@@ -147,12 +149,15 @@ ${rawContent.slice(0, 6000)}
 ${instructions}
 - "descricao_completa": descrição detalhada do lugar (2-4 frases)
 - "fotos": array de URLs de imagens encontradas no conteúdo (máximo 4)
+- "instagram_url": URL do perfil Instagram encontrada no conteúdo (ex: "https://instagram.com/nomedolugar"), ou null
+- "google_maps_url": URL do Google Maps encontrada no conteúdo, ou null
 
 Se um campo não for encontrado no conteúdo, use null.
 Retorne APENAS JSON puro, sem markdown:
 {
   "nome": "${nome}",
   "site_oficial": "${siteUrl}",
+  "source": "official",
   "telefone": null,
   "endereco": null,
   "horario": null,
@@ -165,7 +170,9 @@ Retorne APENAS JSON puro, sem markdown:
   "menu": [],
   "ingressos": [],
   "duracao": null,
-  "como_chegar": null
+  "como_chegar": null,
+  "instagram_url": null,
+  "google_maps_url": null
 }`;
 }
 
@@ -196,10 +203,17 @@ function buildGeminiKnowledgePrompt(nome: string, categoria: string, destination
 
   return `Com base no seu conhecimento de treinamento, forneça detalhes realistas sobre "${nome}", um(a) ${categoria} em ${destination}.
 
-Retorne JSON puro sem markdown:
+RETORNE JSON PURO SEM MARKDOWN. Preencha OBRIGATORIAMENTE:
+- "endereco": endereço completo real (rua, número, bairro, cidade) — use seu conhecimento de treinamento
+- "telefone": número de telefone real com DDD — use seu conhecimento de treinamento
+- "instagram_url": URL do perfil Instagram oficial (formato: "https://instagram.com/handle") — se conhecer
+- "google_maps_url": gere um link de busca do Google Maps: "https://www.google.com/maps/search/${encodeURIComponent(nome)}+${encodeURIComponent(destination)}"
+
+Esquema de resposta:
 {
   "nome": "${nome}",
   "site_oficial": null,
+  "source": "knowledge",
   "descricao_completa": "descrição detalhada em 2-3 frases",
   "telefone": null,
   "endereco": null,
@@ -212,40 +226,44 @@ Retorne JSON puro sem markdown:
   "menu": [],
   "ingressos": [],
   "duracao": null,
-  "como_chegar": null
+  "como_chegar": null,
+  "instagram_url": null,
+  "google_maps_url": "https://www.google.com/maps/search/${encodeURIComponent(nome)}+${encodeURIComponent(destination)}"
 }
 
 ${instructions}
 
-Use valores estimados realistas para ${destination}. Se não souber detalhes específicos, deixe null.`;
+Use valores reais que você conhece para ${destination}. Para campos que não souber, use null — exceto google_maps_url que sempre deve ser preenchido.`;
 }
 
 export async function extractPlaceDetails(
   nome: string,
   categoria: string,
-  siteOficial: string,
+  siteOficial: string | null,
   keys: ApiKeys,
   destination = ''
 ): Promise<PlaceDetail> {
-  const rawContent = await extractWithTavily(siteOficial, keys.tavily);
-
-  if (rawContent) {
-    const prompt = buildDetailParsePrompt(nome, categoria, siteOficial, rawContent);
-    try {
-      const detail = await callGeminiRaw<PlaceDetail>(prompt, keys.gemini);
-      return { ...detail, nome, site_oficial: siteOficial };
-    } catch {
-      // fall through to Gemini knowledge fallback
+  if (siteOficial) {
+    const rawContent = await extractWithTavily(siteOficial, keys.tavily);
+    if (rawContent) {
+      const prompt = buildDetailParsePrompt(nome, categoria, siteOficial, rawContent);
+      try {
+        const detail = await callGeminiRaw<PlaceDetail>(prompt, keys.gemini);
+        return { ...detail, nome, site_oficial: siteOficial, source: 'official' };
+      } catch {
+        // fall through to Gemini knowledge fallback
+      }
     }
   }
 
-  // Gemini knowledge fallback — always returns useful content
-  const fallbackPrompt = buildGeminiKnowledgePrompt(nome, categoria, destination || siteOficial);
+  // Gemini knowledge fallback — used when no site or Tavily fails
+  const fallbackPrompt = buildGeminiKnowledgePrompt(nome, categoria, destination || siteOficial || nome);
   try {
     const detail = await callGeminiRaw<PlaceDetail>(fallbackPrompt, keys.gemini);
-    return { ...detail, nome, site_oficial: siteOficial };
+    return { ...detail, nome, site_oficial: siteOficial ?? null, source: 'knowledge' };
   } catch {
-    return { nome, site_oficial: siteOficial };
+    const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(nome)}+${encodeURIComponent(destination)}`;
+    return { nome, site_oficial: siteOficial ?? null, source: 'knowledge', google_maps_url: mapsUrl };
   }
 }
 

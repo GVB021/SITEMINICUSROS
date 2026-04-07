@@ -79,8 +79,11 @@ export interface Event {
 
 export interface Transport {
   tipo: string;
+  nome: string;
   descricao: string;
   valor: number;
+  site_oficial?: string | null;
+  telefone?: string | null;
 }
 
 export interface SpecialExperience {
@@ -174,7 +177,7 @@ export interface PlaceDetailTicket {
 
 export interface PlaceDetail {
   nome: string;
-  site_oficial: string;
+  site_oficial: string | null;
   telefone?: string | null;
   endereco?: string | null;
   horario?: string | null;
@@ -191,6 +194,11 @@ export interface PlaceDetail {
   ingressos?: PlaceDetailTicket[];
   duracao?: string;
   como_chegar?: string;
+  // social / maps
+  instagram_url?: string | null;
+  google_maps_url?: string | null;
+  // source marker for disclaimer
+  source?: 'official' | 'knowledge';
   // raw fallback
   raw_info?: string;
 }
