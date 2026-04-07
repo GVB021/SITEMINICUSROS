@@ -103,6 +103,7 @@ export interface PeriodDish {
 }
 
 export interface PeriodDetail {
+  local_nome?: string;
   pratos?: PeriodDish[];
   distancia_hotel?: string;
   tarifa_taxi?: number;

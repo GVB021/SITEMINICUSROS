@@ -1,4 +1,5 @@
 import type { TripConfig, ConciergeResponse, PlaceDetail } from './types';
+import { computeNights } from './utils/dates';
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_PROXY_URL = import.meta.env.DEV
@@ -16,13 +17,7 @@ const SYSTEM_PROMPT =
 // ── Gemini-only prompt ─────────────────────────────────────────────────────
 
 function buildGeminiDirectPrompt(config: TripConfig): string {
-  const nights = Math.max(
-    1,
-    Math.ceil(
-      (new Date(config.checkOut).getTime() - new Date(config.checkIn).getTime()) /
-        (1000 * 60 * 60 * 24)
-    )
-  );
+  const nights = computeNights(config.checkIn, config.checkOut);
 
   const profileLabels: Record<string, string> = {
     solo: 'viajante solo', casal: 'casal',
@@ -270,26 +265,24 @@ async function callGeminiRaw<T>(prompt: string, geminiKey: string, maxTokens = 4
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const msg = (errorData as { error?: { message?: string } })?.error?.message || `HTTP ${response.status}`;
-    console.error('[Gemini] HTTP error:', msg);
-    throw new Error(`Erro na API Gemini: ${msg}`);
+    const errorData: unknown = await response.json().catch(() => ({}));
+    const errMsg =
+      typeof errorData === 'object' &&
+      errorData !== null &&
+      'error' in errorData &&
+      typeof (errorData as Record<string, unknown>).error === 'object' &&
+      (errorData as Record<string, unknown>).error !== null
+        ? ((errorData as Record<string, { message?: unknown }>).error?.message as string | undefined)
+        : undefined;
+    throw new Error(`Erro na API Gemini: ${errMsg ?? `HTTP ${response.status}`}`);
   }
 
   const data = await response.json();
-  const finishReason = data.candidates?.[0]?.finishReason;
   const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
   if (!rawText) {
-    console.error('[Gemini] Empty response. Full data:', JSON.stringify(data));
     throw new Error('A API não retornou conteúdo. Verifique sua chave.');
   }
-
-  if (finishReason === 'MAX_TOKENS') {
-    console.warn('[Gemini] Response truncated by MAX_TOKENS. Increase maxOutputTokens.');
-  }
-
-  console.log(`[Gemini] finishReason=${finishReason}, chars=${rawText.length}, maxTokens=${maxTokens}`);
 
   const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
   const end = cleaned.lastIndexOf('}');
@@ -328,10 +321,7 @@ export interface BudgetPlan {
 }
 
 function buildBudgetPlanPrompt(config: TripConfig, listedItems: ConciergeResponse): string {
-  const nights = Math.max(
-    1,
-    Math.ceil((new Date(config.checkOut).getTime() - new Date(config.checkIn).getTime()) / 86400000)
-  );
+  const nights = computeNights(config.checkIn, config.checkOut);
 
   const hotels = (listedItems.hospedagem ?? []).map(h => `${h.nome} (R$${h.diaria}/noite)`).join(', ');
   const restaurants = (listedItems.restaurantes ?? []).map(r => `${r.nome} (R$${r.preco_por_pessoa}/pessoa)`).join(', ');
@@ -353,15 +343,17 @@ Transporte: ${transport}
 
 Monte o melhor roteiro completo dentro do orçamento. Selecione 1 hospedagem, refeições e passeios para cada dia.
 
+REGRA: nas descrições de manha/tarde/noite SEMPRE mencione o nome real do estabelecimento (ex: "Almoço no Restaurante Sabor da Montanha", "Visita à Cachoeira dos Namorados").
+
 Campos obrigatórios:
 - hospedagem_sugerida: nome exato da hospedagem escolhida (string)
 - restaurantes_sugeridos: array de nomes escolhidos
 - roteiro_dia_a_dia[]: para cada dia inclua:
   - dia(number), data(string), manha(string), tarde(string), noite(string), custo_estimado(number)
   - manha_detalhe, tarde_detalhe, noite_detalhe: objetos opcionais com:
+    - local_nome: nome exato do estabelecimento/atração deste período (string)
     - pratos: array SOMENTE se o período for uma refeição — até 3 pratos [{nome, descricao(≤8 palavras), preco(number)}]
     - distancia_hotel: distância em km da hospedagem até o local (string, ex: "2.3 km") — omita se for no hotel
-    - tarifa_taxi: valor estimado em R$ de táxi até o local (number) — omita se for no hotel
 - resumo_orcamento{}: hospedagem, alimentacao, passeios, transporte, eventos, experiencias, total (todos numbers, total ≤ R$${config.budget})
 - dica_economia: dica rápida para economizar`;
 }

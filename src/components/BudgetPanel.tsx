@@ -12,31 +12,39 @@ interface Props {
   onReoptimize: () => void;
 }
 
+function computeTaxi(distanciaHotel?: string): number | null {
+  if (!distanciaHotel) return null;
+  const km = parseFloat(distanciaHotel.replace(',', '.'));
+  if (isNaN(km) || km <= 0) return null;
+  return Math.round(5.5 + km * 2.8);
+}
+
 function PeriodDetailPanel({ detail }: { detail: PeriodDetail }) {
-  const hasDishes = (detail.pratos?.length ?? 0) > 0;
-  const hasTransport = detail.distancia_hotel || detail.tarifa_taxi != null;
+  const hasDishes   = (detail.pratos?.length ?? 0) > 0;
+  const taxiFare    = computeTaxi(detail.distancia_hotel);
+  const hasTransport = detail.distancia_hotel || taxiFare != null;
   if (!hasDishes && !hasTransport) return null;
   return (
-    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {hasDishes && (
         <div>
-          <p style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 7 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
             🍽 Pratos sugeridos
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {detail.pratos!.map((p, i) => (
               <div key={i} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                background: 'var(--bg-card)', borderRadius: 6, padding: '7px 10px',
-                border: '1px solid var(--border)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 12px',
+                border: '1px solid rgba(255,255,255,0.06)',
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 500 }}>{p.nome}</span>
                   {p.descricao && (
-                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)', marginLeft: 6 }}>— {p.descricao}</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)', marginLeft: 6 }}>· {p.descricao}</span>
                   )}
                 </div>
-                <span className="badge-gold" style={{ fontSize: 11.5, flexShrink: 0, marginLeft: 10 }}>
+                <span className="badge-gold" style={{ fontSize: 11.5, flexShrink: 0, marginLeft: 12 }}>
                   R$ {p.preco.toLocaleString('pt-BR')}
                 </span>
               </div>
@@ -46,18 +54,22 @@ function PeriodDetailPanel({ detail }: { detail: PeriodDetail }) {
       )}
       {hasTransport && (
         <div style={{
-          display: 'flex', gap: 16, flexWrap: 'wrap',
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 6, padding: '8px 10px',
+          display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center',
+          background: 'rgba(201,169,110,0.06)', border: '1px solid var(--gold-border)',
+          borderRadius: 8, padding: '9px 14px',
         }}>
           {detail.distancia_hotel && (
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              📍 <strong style={{ color: 'var(--text-secondary)' }}>{detail.distancia_hotel}</strong> do hotel
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span>📍</span>
+              <strong style={{ color: 'var(--text-secondary)' }}>{detail.distancia_hotel}</strong>
+              <span>do hotel</span>
             </span>
           )}
-          {detail.tarifa_taxi != null && (
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              🚕 Táxi aprox. <strong style={{ color: 'var(--text-secondary)' }}>R$ {detail.tarifa_taxi.toLocaleString('pt-BR')}</strong>
+          {taxiFare != null && (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span>🚕</span>
+              <span>Táxi aprox.</span>
+              <strong style={{ color: 'var(--gold-light)' }}>R$ {taxiFare.toLocaleString('pt-BR')}</strong>
             </span>
           )}
         </div>
@@ -72,7 +84,8 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
   const togglePeriod = (key: string) =>
     setExpandedPeriodKey(prev => (prev === key ? null : key));
 
-  const budget = config.budget!;
+  if (!config.budget) return null;
+  const budget = config.budget;
   const breakdown = budgetPlan?.resumo_orcamento;
   const itinerary = budgetPlan?.roteiro_dia_a_dia ?? [];
 
@@ -93,14 +106,29 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
 
   if (loadingBudget) {
     return (
-      <div style={{ padding: '60px 0', textAlign: 'center' }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          border: '2px solid var(--border)', borderTop: '2px solid var(--gold)',
-          animation: 'spin-slow 1.2s linear infinite',
-          margin: '0 auto 20px',
-        }} />
-        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', width: '100%' }}>
+        {/* Accommodation skeleton */}
+        <div className="skeleton" style={{ height: 68, borderRadius: 12, marginBottom: 20 }} />
+        {/* Tip skeleton */}
+        <div className="skeleton" style={{ height: 48, borderRadius: 10, marginBottom: 24 }} />
+        {/* Summary cards skeleton */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12, marginBottom: 24 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} className="skeleton" style={{ height: 88, borderRadius: 12 }} />
+          ))}
+        </div>
+        {/* Progress bar skeleton */}
+        <div className="skeleton" style={{ height: 12, borderRadius: 6, marginBottom: 32 }} />
+        {/* Breakdown table skeleton */}
+        <div className="skeleton" style={{ height: 220, borderRadius: 12, marginBottom: 32 }} />
+        {/* Itinerary day skeletons */}
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{ display: 'flex', gap: 20, marginBottom: 24 }}>
+            <div className="skeleton" style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, marginTop: 14 }} />
+            <div className="skeleton" style={{ flex: 1, height: 140, borderRadius: 14 }} />
+          </div>
+        ))}
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', marginTop: 8, fontStyle: 'italic' }}>
           Montando seu roteiro dentro do orçamento…
         </p>
       </div>
@@ -119,7 +147,7 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', width: '100%' }}>
 
       {/* ── Suggested Accommodation ─────────────────────────────────────── */}
       {budgetPlan.hospedagem_sugerida && (
@@ -179,9 +207,9 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
       {/* ── Budget Summary ──────────────────────────────────────────────── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: 16,
-        marginBottom: 32,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
+        gap: 12,
+        marginBottom: 24,
       }}>
         <div style={summaryCard}>
           <p style={summaryLabel}>Orçamento disponível</p>
@@ -197,12 +225,12 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
         </div>
         <div style={{
           ...summaryCard,
-          borderColor: overBudget ? 'rgba(239,68,68,0.3)' : 'rgba(78,205,196,0.3)',
-          background: overBudget ? 'rgba(239,68,68,0.08)' : 'var(--teal-dim)',
+          borderColor: overBudget ? 'var(--danger-border)' : 'rgba(78,205,196,0.3)',
+          background: overBudget ? 'var(--danger-bg)' : 'var(--teal-dim)',
           border: undefined,
         }}>
           <p style={summaryLabel}>{overBudget ? '⚠️ Ultrapassou em' : '✅ Saldo restante'}</p>
-          <p style={{ ...summaryValue, color: overBudget ? '#ef4444' : 'var(--teal)' }}>
+          <p style={{ ...summaryValue, color: overBudget ? 'var(--danger)' : 'var(--teal)' }}>
             R$ {Math.abs(diff).toLocaleString('pt-BR')}
           </p>
         </div>
@@ -231,13 +259,13 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
               height: '100%',
               width: `${Math.min(100, (total / budget) * 100)}%`,
               background: overBudget
-                ? '#ef4444'
+                ? 'var(--danger)'
                 : 'linear-gradient(90deg, var(--teal), var(--gold))',
               borderRadius: 6,
               transition: 'width 0.6s ease',
             }} />
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, textAlign: 'right' }}>
+          <p style={{ fontSize: 12, color: overBudget ? 'var(--danger)' : 'var(--text-muted)', marginTop: 6, textAlign: 'right' }}>
             {((total / budget) * 100).toFixed(0)}% do orçamento utilizado
           </p>
         </div>
@@ -322,119 +350,156 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
         <div style={{ marginBottom: 32 }}>
           <h3 style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 22,
-            fontWeight: 400,
+            fontSize: 26, fontWeight: 400,
             color: 'var(--text-primary)',
-            marginBottom: 20,
+            marginBottom: 28,
+            letterSpacing: '-0.01em',
           }}>
             Roteiro Dia a Dia
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Timeline container */}
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {/* Vertical gold line */}
+            <div style={{
+              position: 'absolute',
+              left: 19, top: 20, bottom: 20,
+              width: 1,
+              background: 'linear-gradient(180deg, var(--gold-border) 0%, rgba(201,169,110,0.1) 100%)',
+              zIndex: 0,
+            }} />
+
             {itinerary.map((day, idx) => (
               <div
                 key={idx}
-                className="glass-card animate-fadeInUp"
+                className="animate-fadeInUp"
                 style={{
-                  padding: '20px 24px',
-                  animationDelay: `${idx * 0.08}s`,
+                  display: 'flex', gap: 20,
+                  animationDelay: `${idx * 0.07}s`,
                   opacity: 0,
+                  marginBottom: 24,
+                  position: 'relative', zIndex: 1,
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 16,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{
-                      width: 36, height: 36,
-                      borderRadius: '50%',
-                      background: 'var(--gold-dim)',
-                      border: '1px solid var(--gold-border)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: 'var(--gold)',
-                    }}>
-                      {day.dia}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
-                        Dia {day.dia}
-                      </p>
-                      {day.data && (
-                        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{day.data}</p>
-                      )}
-                    </div>
+                {/* Timeline circle */}
+                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 14 }}>
+                  <div style={{
+                    width: 38, height: 38,
+                    borderRadius: '50%',
+                    background: 'var(--bg-base)',
+                    border: '2px solid var(--gold-border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 0 16px rgba(201,169,110,0.15)',
+                  }}>
+                    <span style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 14, fontWeight: 500, color: 'var(--gold)',
+                    }}>{day.dia}</span>
                   </div>
-                  {day.custo_estimado > 0 && (
-                    <span className="badge-gold">
-                      R$ {day.custo_estimado.toLocaleString('pt-BR')}
-                    </span>
-                  )}
                 </div>
 
+                {/* Day card */}
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: 12,
+                  flex: 1,
+                  background: 'linear-gradient(145deg, var(--bg-card) 0%, rgba(16,18,24,0.95) 100%)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
                 }}>
-                  {([
-                    { period: '🌅 Manhã',  content: day.manha, detalhe: day.manha_detalhe, key: `${idx}-manha`  },
-                    { period: '☀️ Tarde',  content: day.tarde, detalhe: day.tarde_detalhe, key: `${idx}-tarde`  },
-                    { period: '🌙 Noite',  content: day.noite, detalhe: day.noite_detalhe, key: `${idx}-noite`  },
-                  ] as const).filter(p => p.content).map((p) => {
-                    const hasDetail = p.detalhe && (
-                      (p.detalhe.pratos?.length ?? 0) > 0 ||
-                      p.detalhe.distancia_hotel ||
-                      p.detalhe.tarifa_taxi != null
-                    );
-                    const isExpanded = expandedPeriodKey === p.key;
-                    return (
-                      <div
-                        key={p.key}
-                        style={{
-                          background: isExpanded ? 'var(--bg-card)' : 'var(--bg-surface)',
-                          border: `1px solid ${isExpanded ? 'var(--gold-border)' : 'var(--border)'}`,
-                          borderRadius: 8,
-                          padding: '12px 14px',
-                          transition: 'background 0.15s, border-color 0.15s',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                          <p style={{
-                            fontSize: 11,
-                            color: 'var(--gold)',
-                            fontWeight: 500,
-                            letterSpacing: '0.08em',
-                            textTransform: 'uppercase',
-                          }}>
-                            {p.period}
-                          </p>
-                          {hasDetail && (
-                            <button
-                              onClick={() => togglePeriod(p.key)}
-                              style={{
-                                background: 'none', border: 'none', cursor: 'pointer',
-                                fontSize: 11, color: isExpanded ? 'var(--gold)' : 'var(--text-muted)',
-                                fontWeight: 600, padding: '1px 4px',
-                                transition: 'color 0.15s',
-                              }}
-                            >
-                              {isExpanded ? '▲ Fechar' : '▼ Detalhes'}
-                            </button>
+                  {/* Day header */}
+                  <div style={{
+                    padding: '14px 20px',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: 'rgba(255,255,255,0.02)',
+                  }}>
+                    <div>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Dia {day.dia}</span>
+                      {day.data && <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 10 }}>{day.data}</span>}
+                    </div>
+                    {day.custo_estimado > 0 && (
+                      <span className="badge-gold" style={{ fontSize: 12.5 }}>
+                        R$ {day.custo_estimado.toLocaleString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Period blocks */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {([
+                      { period: '🌅 Manhã', content: day.manha, detalhe: day.manha_detalhe, key: `${idx}-manha` },
+                      { period: '☀️ Tarde', content: day.tarde, detalhe: day.tarde_detalhe, key: `${idx}-tarde` },
+                      { period: '🌙 Noite', content: day.noite, detalhe: day.noite_detalhe, key: `${idx}-noite` },
+                    ] as const).filter(p => p.content).map((p, pi, arr) => {
+                      const taxiFare = computeTaxi(p.detalhe?.distancia_hotel);
+                      const hasDetail = p.detalhe && (
+                        (p.detalhe.pratos?.length ?? 0) > 0 ||
+                        p.detalhe.distancia_hotel ||
+                        taxiFare != null
+                      );
+                      const isExpanded = expandedPeriodKey === p.key;
+                      return (
+                        <div
+                          key={p.key}
+                          style={{
+                            padding: '14px 20px',
+                            borderBottom: pi < arr.length - 1 ? '1px solid var(--border)' : 'none',
+                            background: isExpanded ? 'rgba(201,169,110,0.04)' : 'transparent',
+                            transition: 'background 0.2s',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                            <div style={{ flex: 1 }}>
+                              {/* Period label */}
+                              <p style={{
+                                fontSize: 10, fontWeight: 700,
+                                color: 'var(--gold)', letterSpacing: '0.14em',
+                                textTransform: 'uppercase', marginBottom: 4,
+                              }}>
+                                {p.period}
+                              </p>
+                              {/* local_nome as prominent title */}
+                              {p.detalhe?.local_nome && (
+                                <p style={{
+                                  fontSize: 13.5, fontWeight: 600,
+                                  color: 'var(--text-primary)', marginBottom: 3,
+                                  fontFamily: 'var(--font-display)', letterSpacing: '0.01em',
+                                }}>
+                                  {p.detalhe.local_nome}
+                                </p>
+                              )}
+                              {/* Description */}
+                              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+                                {p.content}
+                              </p>
+                            </div>
+                            {/* Details toggle */}
+                            {hasDetail && (
+                              <button
+                                onClick={() => togglePeriod(p.key)}
+                                style={{
+                                  flexShrink: 0,
+                                  background: isExpanded ? 'var(--gold-dim)' : 'rgba(255,255,255,0.04)',
+                                  border: `1px solid ${isExpanded ? 'var(--gold-border)' : 'var(--border)'}`,
+                                  borderRadius: 6, cursor: 'pointer',
+                                  fontSize: 11, color: isExpanded ? 'var(--gold)' : 'var(--text-muted)',
+                                  fontWeight: 600, padding: '4px 10px',
+                                  transition: 'all 0.15s',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {isExpanded ? '▲ Fechar' : '▼ Detalhes'}
+                              </button>
+                            )}
+                          </div>
+                          {isExpanded && p.detalhe && (
+                            <PeriodDetailPanel detail={p.detalhe} />
                           )}
                         </div>
-                        <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                          {p.content}
-                        </p>
-                        {isExpanded && p.detalhe && (
-                          <PeriodDetailPanel detail={p.detalhe} />
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             ))}
@@ -445,13 +510,13 @@ export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, o
       {/* ── Overspend warning + reoptimize ──────────────────────────────── */}
       {overBudget && (
         <div style={{
-          background: 'rgba(239,68,68,0.08)',
-          border: '1px solid rgba(239,68,68,0.25)',
+          background: 'var(--danger-bg)',
+          border: '1px solid var(--danger-border)',
           borderRadius: 12,
           padding: '20px 24px',
           marginBottom: 24,
         }}>
-          <p style={{ fontSize: 14, fontWeight: 500, color: '#ef4444', marginBottom: 8 }}>
+          <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--danger)', marginBottom: 8 }}>
             ⚠️ Orçamento ultrapassado em R$ {Math.abs(diff).toLocaleString('pt-BR')}
           </p>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>

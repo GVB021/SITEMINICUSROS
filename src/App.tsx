@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TripForm from './components/TripForm';
 import ConciergePanel from './components/ConciergePanel';
+import ErrorBoundary from './components/ErrorBoundary';
 import type { TripConfig, ConciergeResponse, ItineraryItem } from './types';
 import { fetchConciergeData, type ApiKeys } from './api';
 
@@ -49,17 +50,8 @@ export default function App() {
     setItinerary((prev) => prev.filter((i) => i.id !== id));
   }
 
-  async function handleReoptimize() {
-    if (!tripConfig || !API_KEYS.gemini) return;
-    setScreen('loading');
-    try {
-      const data = await fetchConciergeData(tripConfig, API_KEYS);
-      setConciergeData(data);
-      setScreen('panel');
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Erro desconhecido');
-      setScreen('error');
-    }
+  function handleReoptimize() {
+    if (tripConfig) void handleFormSubmit(tripConfig);
   }
 
   return (
@@ -77,16 +69,18 @@ export default function App() {
       )}
 
       {screen === 'panel' && conciergeData && tripConfig && (
-        <ConciergePanel
-          data={conciergeData}
-          config={tripConfig}
-          itinerary={itinerary}
-          onAddItem={handleAddToItinerary}
-          onRemoveItem={handleRemoveFromItinerary}
-          onBack={() => setScreen('form')}
-          onReoptimize={handleReoptimize}
-          apiKeys={API_KEYS}
-        />
+        <ErrorBoundary>
+          <ConciergePanel
+            data={conciergeData}
+            config={tripConfig}
+            itinerary={itinerary}
+            onAddItem={handleAddToItinerary}
+            onRemoveItem={handleRemoveFromItinerary}
+            onBack={() => setScreen('form')}
+            onReoptimize={handleReoptimize}
+            apiKeys={API_KEYS}
+          />
+        </ErrorBoundary>
       )}
     </div>
   );
@@ -95,59 +89,110 @@ export default function App() {
 /* ─── Loading Screen ────────────────────────────────────────────────────── */
 function LoadingScreen({ destination }: { destination: string }) {
   const messages = [
-    'Consultando o concierge local...',
-    'Descobrindo os melhores restaurantes...',
-    'Selecionando hospedagens exclusivas...',
-    'Mapeando experiências únicas...',
-    'Verificando eventos no período...',
-    'Montando seu roteiro personalizado...',
+    'Consultando o concierge local…',
+    'Descobrindo os melhores restaurantes…',
+    'Selecionando hospedagens exclusivas…',
+    'Mapeando experiências únicas…',
+    'Verificando eventos no período…',
+    'Montando seu roteiro personalizado…',
   ];
-  const [msgIdx] = useState(() => Math.floor(Math.random() * messages.length));
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setMsgIdx(i => (i + 1) % messages.length), 2200);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', padding: '40px 20px',
+      position: 'relative', overflow: 'hidden',
     }}>
-      {/* Animated compass */}
-      <div style={{ position: 'relative', marginBottom: 40 }}>
+      {/* Atmospheric layers */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{
-          width: 80, height: 80, borderRadius: '50%',
-          border: '2px solid var(--border-light)',
-          borderTop: '2px solid var(--gold)',
-          animation: 'spin-slow 1.5s linear infinite',
+          position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)',
+          width: 700, height: 700,
+          background: 'radial-gradient(ellipse, rgba(201,169,110,0.07) 0%, transparent 65%)',
+          animation: 'float 6s ease-in-out infinite',
         }} />
         <div style={{
+          position: 'absolute', bottom: '10%', right: '15%',
+          width: 400, height: 400,
+          background: 'radial-gradient(ellipse, rgba(78,205,196,0.04) 0%, transparent 60%)',
+          animation: 'float 9s ease-in-out 1s infinite',
+        }} />
+      </div>
+
+      {/* Logo mark */}
+      <div className="animate-fadeInUp" style={{ marginBottom: 48, position: 'relative' }}>
+        {/* Outer rotating ring */}
+        <div style={{
+          width: 100, height: 100, borderRadius: '50%',
+          border: '1px solid var(--gold-border)',
+          borderTop: '2px solid var(--gold)',
+          animation: 'spin-slow 2s linear infinite',
           position: 'absolute', inset: 0,
+        }} />
+        {/* Inner counter-rotating ring */}
+        <div style={{
+          width: 100, height: 100, borderRadius: '50%',
+          border: '1px solid rgba(78,205,196,0.2)',
+          borderBottom: '1px solid var(--teal)',
+          animation: 'spin-slow 3s linear infinite reverse',
+          position: 'absolute', inset: 0,
+        }} />
+        {/* Center icon */}
+        <div style={{
+          width: 100, height: 100,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 28,
+          fontSize: 32, position: 'relative',
         }}>
-          🧭
+          ✦
         </div>
       </div>
 
-      <h2 className="font-display" style={{
-        fontSize: 32, fontWeight: 300, color: 'var(--text-primary)',
-        marginBottom: 12, textAlign: 'center',
-      }}>
-        Preparando sua viagem para<br />
-        <span className="text-gold-gradient">{destination}</span>
-      </h2>
+      {/* Destination text */}
+      <div className="animate-fadeInUp stagger-1" style={{ textAlign: 'center', marginBottom: 20 }}>
+        <p style={{
+          fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase',
+          color: 'var(--text-muted)', fontWeight: 600, marginBottom: 12,
+        }}>
+          Preparando sua viagem para
+        </p>
+        <h2 className="font-display text-gold-gradient" style={{
+          fontSize: 'clamp(36px, 6vw, 56px)',
+          fontWeight: 300, lineHeight: 1.1,
+          letterSpacing: '-0.01em',
+        }}>
+          {destination}
+        </h2>
+      </div>
 
-      <p style={{ color: 'var(--text-secondary)', fontSize: 15, marginBottom: 32, textAlign: 'center' }}>
+      {/* Rotating message */}
+      <p className="animate-fadeInUp stagger-2" style={{
+        color: 'var(--text-secondary)', fontSize: 14,
+        textAlign: 'center', marginBottom: 40,
+        minHeight: 22, transition: 'opacity 0.4s',
+        fontStyle: 'italic',
+      }}>
         {messages[msgIdx]}
       </p>
 
-      {/* Progress dots */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        {[0, 1, 2].map((i) => (
-          <div key={i} style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: 'var(--gold)',
-            opacity: 0.3,
-            animation: `pulse-gold 1.2s ease-in-out ${i * 0.2}s infinite`,
-          }} />
-        ))}
+      {/* Progress bar */}
+      <div className="animate-fadeInUp stagger-3" style={{
+        width: 180, height: 2,
+        background: 'var(--border)',
+        borderRadius: 2, overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%',
+          background: 'linear-gradient(90deg, var(--gold) 0%, var(--teal) 100%)',
+          borderRadius: 2,
+          animation: 'shimmer 1.8s ease-in-out infinite',
+          backgroundSize: '200% 100%',
+        }} />
       </div>
     </div>
   );

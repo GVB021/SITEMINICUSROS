@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { ItineraryItem, TripConfig } from '../types';
 
 interface Props {
@@ -29,6 +30,13 @@ const typeLabels: Record<string, string> = {
 export default function ItinerarySidebar({ open, items, config, onClose, onRemove }: Props) {
   const total = items.reduce((sum, i) => sum + i.preco, 0);
   const budgetLeft = config.budget ? config.budget - total : null;
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
 
   function exportItinerary() {
     const lines: string[] = [
@@ -92,19 +100,24 @@ export default function ItinerarySidebar({ open, items, config, onClose, onRemov
       )}
 
       {/* Drawer */}
-      <div style={{
-        position: 'fixed',
-        top: 0, right: 0, bottom: 0,
-        width: 380,
-        background: 'var(--bg-surface)',
-        borderLeft: '1px solid var(--border)',
-        zIndex: 201,
-        display: 'flex',
-        flexDirection: 'column',
-        transform: open ? 'translateX(0)' : 'translateX(100%)',
-        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
-      }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Meu Roteiro"
+        style={{
+          position: 'fixed',
+          top: 0, right: 0, bottom: 0,
+          width: 'min(380px, 100vw)',
+          background: 'var(--bg-surface)',
+          borderLeft: '1px solid var(--border)',
+          zIndex: 201,
+          display: 'flex',
+          flexDirection: 'column',
+          transform: open ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}>
         {/* Header */}
         <div style={{
           padding: '20px 24px',
@@ -129,6 +142,7 @@ export default function ItinerarySidebar({ open, items, config, onClose, onRemov
           </div>
           <button
             onClick={onClose}
+            aria-label="Fechar roteiro"
             style={{
               background: 'var(--bg-hover)',
               border: '1px solid var(--border)',
@@ -256,7 +270,7 @@ export default function ItinerarySidebar({ open, items, config, onClose, onRemov
                   <span style={{
                     fontSize: 14,
                     fontWeight: 500,
-                    color: budgetLeft >= 0 ? 'var(--teal)' : '#ef4444',
+                    color: budgetLeft >= 0 ? 'var(--teal)' : 'var(--danger)',
                   }}>
                     {budgetLeft >= 0 ? '+' : '-'}R$ {Math.abs(budgetLeft).toLocaleString('pt-BR')}
                   </span>
@@ -274,7 +288,7 @@ export default function ItinerarySidebar({ open, items, config, onClose, onRemov
                     width: `${Math.min(100, (total / config.budget!) * 100)}%`,
                     background: budgetLeft >= 0
                       ? 'linear-gradient(90deg, var(--teal), var(--gold))'
-                      : '#ef4444',
+                      : 'var(--danger)',
                     borderRadius: 2,
                     transition: 'width 0.4s ease',
                   }} />

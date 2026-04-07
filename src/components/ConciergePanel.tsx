@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ConciergeResponse, TripConfig, ItineraryItem, PlaceDetail, ItineraryItemType } from '../types';
 import { extractPlaceDetails, fetchBudgetPlan, type ApiKeys, type BudgetPlan } from '../api';
-// PlaceDetailModal removed — details now expand inline in CategorySection
+import { getDestinationPhoto } from '../constants/destinations';
+import { computeNights } from '../utils/dates';
+import ErrorBoundary from './ErrorBoundary';
 import ItinerarySidebar from './ItinerarySidebar';
 import CategorySection from './CategorySection';
 import BudgetPanel from './BudgetPanel';
@@ -17,93 +19,6 @@ interface Props {
   apiKeys: ApiKeys;
 }
 
-const DESTINATION_PHOTOS: Record<string, string> = {
-  // Brasil — Sul
-  'gramado':         'https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?w=1600&h=600&fit=crop',
-  'canela':          'https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?w=1600&h=600&fit=crop',
-  'florianopolis':   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'florianópolis':   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'bombinhas':       'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'balneario camboriu': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'balneário camboriú': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'curitiba':        'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=1600&h=600&fit=crop',
-  'foz do iguacu':   'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1600&h=600&fit=crop',
-  'foz do iguaçu':   'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1600&h=600&fit=crop',
-  // Brasil — Sudeste
-  'rio de janeiro':  'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=1600&h=600&fit=crop',
-  'sao paulo':       'https://images.unsplash.com/photo-1578002171197-8d4d1d9a3bb2?w=1600&h=600&fit=crop',
-  'são paulo':       'https://images.unsplash.com/photo-1578002171197-8d4d1d9a3bb2?w=1600&h=600&fit=crop',
-  'monte verde':     'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1600&h=600&fit=crop',
-  'campos do jordao':'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1600&h=600&fit=crop',
-  'campos do jordão':'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1600&h=600&fit=crop',
-  'paraty':          'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=1600&h=600&fit=crop',
-  'parati':          'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=1600&h=600&fit=crop',
-  'angra dos reis':  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'petropolis':      'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1600&h=600&fit=crop',
-  'petrópolis':      'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1600&h=600&fit=crop',
-  'buzios':          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'búzios':          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  // Brasil — Nordeste
-  'salvador':        'https://images.unsplash.com/photo-1548366086-7f1b76106622?w=1600&h=600&fit=crop',
-  'porto seguro':    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'trancoso':        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'morro de sao paulo': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'morro de são paulo': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'fortaleza':       'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'jericoacoara':    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'natal':           'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'recife':          'https://images.unsplash.com/photo-1548366086-7f1b76106622?w=1600&h=600&fit=crop',
-  'olinda':          'https://images.unsplash.com/photo-1548366086-7f1b76106622?w=1600&h=600&fit=crop',
-  'maceio':          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'maceió':          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'lencois maranhenses': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=600&fit=crop',
-  'lençóis maranhenses': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=600&fit=crop',
-  // Brasil — Norte / Centro-Oeste
-  'manaus':          'https://images.unsplash.com/photo-1516912481808-3406841bd33c?w=1600&h=600&fit=crop',
-  'pantanal':        'https://images.unsplash.com/photo-1516912481808-3406841bd33c?w=1600&h=600&fit=crop',
-  'bonito':          'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1600&h=600&fit=crop',
-  'chapada diamantina': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=600&fit=crop',
-  'chapada dos veadeiros': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=600&fit=crop',
-  'brasilia':        'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=1600&h=600&fit=crop',
-  'brasília':        'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=1600&h=600&fit=crop',
-  // Internacional
-  'paris':           'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1600&h=600&fit=crop',
-  'roma':            'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1600&h=600&fit=crop',
-  'rome':            'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1600&h=600&fit=crop',
-  'lisboa':          'https://images.unsplash.com/photo-1588392382834-a891154bca4d?w=1600&h=600&fit=crop',
-  'lisbon':          'https://images.unsplash.com/photo-1588392382834-a891154bca4d?w=1600&h=600&fit=crop',
-  'barcelona':       'https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=1600&h=600&fit=crop',
-  'madrid':          'https://images.unsplash.com/photo-1543785734-4b6e564642f8?w=1600&h=600&fit=crop',
-  'amsterdam':       'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=1600&h=600&fit=crop',
-  'londres':         'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1600&h=600&fit=crop',
-  'london':          'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1600&h=600&fit=crop',
-  'nova york':       'https://images.unsplash.com/photo-1485871981521-5b1fd3805eee?w=1600&h=600&fit=crop',
-  'new york':        'https://images.unsplash.com/photo-1485871981521-5b1fd3805eee?w=1600&h=600&fit=crop',
-  'miami':           'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'cancun':          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'cancún':          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=600&fit=crop',
-  'buenos aires':    'https://images.unsplash.com/photo-1612294037637-ec328d0e075e?w=1600&h=600&fit=crop',
-  'santiago':        'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=600&fit=crop',
-  'tokyo':           'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1600&h=600&fit=crop',
-  'tóquio':          'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1600&h=600&fit=crop',
-  'dubai':           'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1600&h=600&fit=crop',
-  'bali':            'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1600&h=600&fit=crop',
-  'maldivas':        'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=1600&h=600&fit=crop',
-  'maldives':        'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=1600&h=600&fit=crop',
-};
-
-function getDestinationPhoto(destination: string): string {
-  const key = destination.toLowerCase().trim();
-  // Exact match
-  if (DESTINATION_PHOTOS[key]) return DESTINATION_PHOTOS[key];
-  // Partial match — check if any known key is contained in the destination string
-  for (const [mapKey, url] of Object.entries(DESTINATION_PHOTOS)) {
-    if (key.includes(mapKey) || mapKey.includes(key)) return url;
-  }
-  // Stable Picsum fallback — seed from destination string for consistency
-  const seed = [...destination].reduce((acc, c) => acc + c.charCodeAt(0), 0) % 1000;
-  return `https://picsum.photos/seed/${seed}/1600/600`;
-}
 
 export default function ConciergePanel({
   data, config, itinerary, onAddItem, onRemoveItem, onBack, onReoptimize, apiKeys,
@@ -113,16 +28,22 @@ export default function ConciergePanel({
 
   const [budgetPlan, setBudgetPlan] = useState<BudgetPlan | null>(null);
   const [loadingBudget, setLoadingBudget] = useState(false);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!config.budget || !apiKeys.gemini) return;
     if (!data?.hospedagem?.length && !data?.restaurantes?.length) return;
     let cancelled = false;
     setBudgetPlan(null);
+    setBudgetError(null);
     setLoadingBudget(true);
     fetchBudgetPlan(config, data, apiKeys)
       .then((plan) => { if (!cancelled) setBudgetPlan(plan); })
-      .catch(console.error)
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setBudgetError(err instanceof Error ? err.message : 'Erro ao gerar o plano de orçamento.');
+        }
+      })
       .finally(() => { if (!cancelled) setLoadingBudget(false); });
     return () => { cancelled = true; };
   }, [data, config, apiKeys]);
@@ -137,9 +58,7 @@ export default function ConciergePanel({
     return extractPlaceDetails(item.nome, item.type, siteUrl, apiKeys, config.destination);
   }, [apiKeys, config.destination]);
 
-  const nights = Math.max(1,
-    Math.ceil((new Date(config.checkOut).getTime() - new Date(config.checkIn).getTime()) / 86400000)
-  );
+  const nights = computeNights(config.checkIn, config.checkOut);
 
   const profileLabels: Record<string, string> = {
     solo: 'Viajante Solo', casal: 'Casal', familia: 'Família', grupo: 'Grupo',
@@ -174,22 +93,23 @@ export default function ConciergePanel({
       {/* ── Top Nav ─────────────────────────────────────────────────────── */}
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 24px',
+        padding: '12px var(--layout-px)',
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-surface)',
         position: 'sticky', top: 0, zIndex: 100,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button className="btn-ghost" onClick={onBack} style={{ padding: '6px 12px', fontSize: 13 }}>
+          <button className="btn-ghost" onClick={onBack} aria-label="Voltar ao formulário" style={{ padding: '6px 12px', fontSize: 13 }}>
             ← Voltar
           </button>
-          <span className="font-display" style={{ fontSize: 16, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+          <span className="font-display hide-mobile" style={{ fontSize: 16, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
             Concierge Virtual
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir roteiro"
             style={{
               background: itinerary.length > 0 ? 'var(--gold-dim)' : 'var(--bg-card)',
               border: `1px solid ${itinerary.length > 0 ? 'var(--gold-border)' : 'var(--border)'}`,
@@ -199,7 +119,7 @@ export default function ConciergePanel({
               transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
-            📋 Meu Roteiro
+            📋 <span className="hide-mobile">Meu Roteiro</span>
             {itinerary.length > 0 && (
               <span style={{
                 background: 'var(--gold)', color: '#0a0b0e',
@@ -215,7 +135,7 @@ export default function ConciergePanel({
       </nav>
 
       {/* ── Hero Banner ─────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', height: 260, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', height: 'clamp(160px, 22vw, 260px)', overflow: 'hidden' }}>
         <img
           src={unsplashUrl}
           alt={config.destination}
@@ -229,7 +149,7 @@ export default function ConciergePanel({
           background: 'linear-gradient(to bottom, rgba(10,11,14,0.3) 0%, rgba(10,11,14,0.85) 100%)',
         }} />
         <div style={{
-          position: 'absolute', bottom: 24, left: 32, right: 32,
+          position: 'absolute', bottom: 16, left: 'var(--layout-px)', right: 'var(--layout-px)',
         }}>
           <p style={{ color: 'var(--gold)', fontSize: 12, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>
             {profileLabels[config.profile]} · {config.types.map(t => typeLabels[t]).join(' · ')}
@@ -254,8 +174,8 @@ export default function ConciergePanel({
       {(data.descricao_destino || data.dica_concierge) && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: data.descricao_destino && data.dica_concierge ? '1fr 1fr' : '1fr',
-          gap: 16, padding: '24px 24px 0',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+          gap: 12, padding: '16px var(--layout-px) 0',
         }}>
           {data.descricao_destino && (
             <div style={{
@@ -288,9 +208,11 @@ export default function ConciergePanel({
       {/* ── Tabs ────────────────────────────────────────────────────────── */}
       <div style={{
         borderBottom: '1px solid var(--border)',
-        padding: '0 24px',
-        marginTop: 24,
+        padding: '0 var(--layout-px)',
+        marginTop: 20,
         display: 'flex', gap: 0, overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
       }}>
         {tabs.map((tab) => (
           <button
@@ -328,7 +250,7 @@ export default function ConciergePanel({
       </div>
 
       {/* ── Tab Content ─────────────────────────────────────────────────── */}
-      <div style={{ padding: '24px', flex: 1 }}>
+      <div style={{ padding: '20px var(--layout-px)', flex: 1 }}>
 
         {activeTab === 'hospedagem' && (
           <CategorySection
@@ -464,15 +386,34 @@ export default function ConciergePanel({
         )}
 
         {activeTab === 'orcamento' && config.budget && (
-          <BudgetPanel
-            data={data}
-            config={config}
-            budgetPlan={budgetPlan}
-            loadingBudget={loadingBudget}
-            onAddItem={onAddItem}
-            addedIds={itinerary.map(i => i.id)}
-            onReoptimize={onReoptimize}
-          />
+          <ErrorBoundary>
+            {budgetError ? (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)', border: '1px solid var(--danger-border)',
+                borderRadius: 12, padding: '20px 24px', maxWidth: 600, margin: '0 auto',
+              }}>
+                <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--danger)', marginBottom: 8 }}>
+                  ⚠️ Erro ao gerar o plano de orçamento
+                </p>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
+                  {budgetError}
+                </p>
+                <button className="btn-ghost" onClick={onReoptimize} style={{ fontSize: 13 }}>
+                  🔄 Tentar novamente
+                </button>
+              </div>
+            ) : (
+              <BudgetPanel
+                data={data}
+                config={config}
+                budgetPlan={budgetPlan}
+                loadingBudget={loadingBudget}
+                onAddItem={onAddItem}
+                addedIds={itinerary.map(i => i.id)}
+                onReoptimize={onReoptimize}
+              />
+            )}
+          </ErrorBoundary>
         )}
       </div>
 
