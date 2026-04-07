@@ -1,8 +1,12 @@
 import type { TripConfig, ConciergeResponse, PlaceDetail } from './types';
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
-const GEMINI_PROXY_URL = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const TAVILY_EXTRACT_URL = '/api/tavily/extract';
+const GEMINI_PROXY_URL = import.meta.env.DEV
+  ? `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`
+  : `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const TAVILY_EXTRACT_URL = import.meta.env.DEV
+  ? '/api/tavily/extract'
+  : 'https://api.tavily.com/extract';
 
 const SYSTEM_PROMPT =
   'Você é um concierge de viagens brasileiro especialista e meticuloso. ' +
