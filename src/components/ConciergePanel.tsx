@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react';
-import type { ConciergeResponse, TripConfig, ItineraryItem } from '../types';
+import { useState, useCallback, useEffect } from 'react';
+import type { ConciergeResponse, TripConfig, ItineraryItem, PlaceDetail, ItineraryItemType } from '../types';
+import { extractPlaceDetails, fetchBudgetPlan, type ApiKeys, type BudgetPlan } from '../api';
+// PlaceDetailModal removed — details now expand inline in CategorySection
 import ItinerarySidebar from './ItinerarySidebar';
 import CategorySection from './CategorySection';
 import BudgetPanel from './BudgetPanel';
@@ -12,6 +14,7 @@ interface Props {
   onRemoveItem: (id: string) => void;
   onBack: () => void;
   onReoptimize: () => void;
+  apiKeys: ApiKeys;
 }
 
 const DESTINATION_PHOTOS: Record<string, string> = {
@@ -103,10 +106,36 @@ function getDestinationPhoto(destination: string): string {
 }
 
 export default function ConciergePanel({
-  data, config, itinerary, onAddItem, onRemoveItem, onBack, onReoptimize,
+  data, config, itinerary, onAddItem, onRemoveItem, onBack, onReoptimize, apiKeys,
 }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('hospedagem');
+
+  const [budgetPlan, setBudgetPlan] = useState<BudgetPlan | null>(null);
+  const [loadingBudget, setLoadingBudget] = useState(false);
+
+  useEffect(() => {
+    if (!config.budget || !apiKeys.gemini) return;
+    if (!data?.hospedagem?.length && !data?.restaurantes?.length) return;
+    let cancelled = false;
+    setBudgetPlan(null);
+    setLoadingBudget(true);
+    fetchBudgetPlan(config, data, apiKeys)
+      .then((plan) => { if (!cancelled) setBudgetPlan(plan); })
+      .catch(console.error)
+      .finally(() => { if (!cancelled) setLoadingBudget(false); });
+    return () => { cancelled = true; };
+  }, [data, config, apiKeys]);
+
+  const handleViewDetails = useCallback(async (item: {
+    nome: string; type: ItineraryItemType; site_oficial?: string | null;
+  }): Promise<PlaceDetail | null> => {
+    const siteUrl = item.site_oficial && item.site_oficial !== 'null' && item.site_oficial.startsWith('http')
+      ? item.site_oficial
+      : null;
+    if (!siteUrl) return null;
+    return extractPlaceDetails(item.nome, item.type, siteUrl, apiKeys, config.destination);
+  }, [apiKeys, config.destination]);
 
   const nights = Math.max(1,
     Math.ceil((new Date(config.checkOut).getTime() - new Date(config.checkIn).getTime()) / 86400000)
@@ -314,10 +343,13 @@ export default function ConciergePanel({
               destaque: h.destaque,
               foto_url: h.foto_url,
               website: h.website,
+              site_oficial: h.site_oficial,
+              telefone: h.telefone,
               rating: h.rating,
               fonte_preco: h.fonte_preco,
             })) ?? []}
             onAdd={handleAdd}
+            onViewDetails={handleViewDetails}
             addedIds={itinerary.map(i => i.id)}
           />
         )}
@@ -335,10 +367,13 @@ export default function ConciergePanel({
               destaque: r.prato_estrela ? `⭐ ${r.prato_estrela}` : undefined,
               foto_url: r.foto_url,
               website: r.website,
+              site_oficial: r.site_oficial,
+              telefone: r.telefone,
               rating: r.rating,
               fonte_preco: r.fonte_preco,
             })) ?? []}
             onAdd={handleAdd}
+            onViewDetails={handleViewDetails}
             addedIds={itinerary.map(i => i.id)}
           />
         )}
@@ -355,10 +390,13 @@ export default function ConciergePanel({
               badge: a.preco === 0 ? 'Gratuito' : `R$ ${a.preco.toLocaleString('pt-BR')}`,
               foto_url: a.foto_url,
               website: a.website,
+              site_oficial: a.site_oficial,
+              telefone: a.telefone,
               rating: a.rating,
               fonte_preco: a.fonte_preco,
             })) ?? []}
             onAdd={handleAdd}
+            onViewDetails={handleViewDetails}
             addedIds={itinerary.map(i => i.id)}
           />
         )}
@@ -373,9 +411,13 @@ export default function ConciergePanel({
               descricao: e.descricao,
               meta: `${e.data} · ${e.local}`,
               badge: e.preco === 0 ? 'Gratuito' : `R$ ${e.preco.toLocaleString('pt-BR')}`,
+              foto_url: e.foto_url,
+              site_oficial: e.site_oficial,
+              telefone: e.telefone,
               fonte_preco: e.fonte_preco,
             })) ?? []}
             onAdd={handleAdd}
+            onViewDetails={handleViewDetails}
             addedIds={itinerary.map(i => i.id)}
             emptyMessage="Nenhum evento especial encontrado para o período informado."
           />
@@ -393,6 +435,7 @@ export default function ConciergePanel({
               badge: `R$ ${t.valor.toLocaleString('pt-BR')}`,
             })) ?? []}
             onAdd={handleAdd}
+            onViewDetails={handleViewDetails}
             addedIds={itinerary.map(i => i.id)}
           />
         )}
@@ -409,10 +452,13 @@ export default function ConciergePanel({
               badge: `R$ ${x.preco_por_pessoa.toLocaleString('pt-BR')}/pessoa`,
               foto_url: x.foto_url,
               website: x.website,
+              site_oficial: x.site_oficial,
+              telefone: x.telefone,
               rating: x.rating,
               fonte_preco: x.fonte_preco,
             })) ?? []}
             onAdd={handleAdd}
+            onViewDetails={handleViewDetails}
             addedIds={itinerary.map(i => i.id)}
           />
         )}
@@ -421,6 +467,10 @@ export default function ConciergePanel({
           <BudgetPanel
             data={data}
             config={config}
+            budgetPlan={budgetPlan}
+            loadingBudget={loadingBudget}
+            onAddItem={onAddItem}
+            addedIds={itinerary.map(i => i.id)}
             onReoptimize={onReoptimize}
           />
         )}
@@ -434,6 +484,7 @@ export default function ConciergePanel({
         onClose={() => setSidebarOpen(false)}
         onRemove={onRemoveItem}
       />
+
     </div>
   );
 }

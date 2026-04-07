@@ -30,6 +30,8 @@ export interface Accommodation {
   destaque?: string;
   foto_url?: string | null;
   website?: string | null;
+  site_oficial?: string | null;
+  telefone?: string | null;
   rating?: number | null;
   fonte_preco?: string | null;
 }
@@ -43,6 +45,8 @@ export interface Restaurant {
   descricao: string;
   foto_url?: string | null;
   website?: string | null;
+  site_oficial?: string | null;
+  telefone?: string | null;
   rating?: number | null;
   fonte_preco?: string | null;
 }
@@ -55,6 +59,8 @@ export interface Attraction {
   descricao: string;
   foto_url?: string | null;
   website?: string | null;
+  site_oficial?: string | null;
+  telefone?: string | null;
   rating?: number | null;
   fonte_preco?: string | null;
 }
@@ -65,6 +71,9 @@ export interface Event {
   preco: number;
   local: string;
   descricao: string;
+  foto_url?: string | null;
+  site_oficial?: string | null;
+  telefone?: string | null;
   fonte_preco?: string | null;
 }
 
@@ -81,6 +90,8 @@ export interface SpecialExperience {
   descricao: string;
   foto_url?: string | null;
   website?: string | null;
+  site_oficial?: string | null;
+  telefone?: string | null;
   rating?: number | null;
   fonte_preco?: string | null;
 }
@@ -119,41 +130,53 @@ export interface ConciergeResponse {
   dica_concierge?: string;
 }
 
-// ── External API types ──────────────────────────────────────────────────────
+// ── Place Detail (extracted from official site via Tavily + Gemini) ────────
 
-export interface FoursquarePhoto {
-  prefix: string;
-  suffix: string;
+export interface PlaceDetailRoom {
+  tipo: string;
+  preco: number;
+  descricao: string;
+  capacidade?: string;
 }
 
-export interface FoursquarePlace {
-  fsq_id: string;
-  name: string;
-  location: { formatted_address?: string; locality?: string };
-  website?: string;
-  tel?: string;
-  rating?: number;
-  price?: number;
-  hours?: { display?: string };
-  photos?: FoursquarePhoto[];
-  photo_url?: string | null;
+export interface PlaceDetailMenuItem {
+  nome: string;
+  descricao: string;
+  preco: number;
 }
 
-export interface TavilyWebResult {
-  title: string;
-  url: string;
-  description: string;
+export interface PlaceDetailMenuSection {
+  secao: string;
+  itens: PlaceDetailMenuItem[];
 }
 
-export interface TavilyCategoryResult {
-  category: string;
-  query: string;
-  results: TavilyWebResult[];
+export interface PlaceDetailTicket {
+  tipo: string;
+  preco: number;
+  descricao: string;
 }
 
-export interface EnrichmentData {
-  foursquare: Record<string, FoursquarePlace[]>;
-  tavily: TavilyCategoryResult[];
+export interface PlaceDetail {
+  nome: string;
+  site_oficial: string;
+  telefone?: string | null;
+  endereco?: string | null;
+  horario?: string | null;
+  descricao_completa?: string | null;
+  fotos?: string[];
+  // hotel
+  quartos?: PlaceDetailRoom[];
+  comodidades?: string[];
+  checkin?: string;
+  checkout?: string;
+  // restaurante
+  menu?: PlaceDetailMenuSection[];
+  // atracao / evento / experiencia
+  ingressos?: PlaceDetailTicket[];
+  duracao?: string;
+  como_chegar?: string;
+  // raw fallback
+  raw_info?: string;
 }
 
 // ── Itinerary item (sidebar) ───────────────────────────────────────────────

@@ -1,15 +1,20 @@
-import type { ConciergeResponse, TripConfig } from '../types';
+import type { ConciergeResponse, TripConfig, ItineraryItem } from '../types';
+import type { BudgetPlan } from '../api';
 
 interface Props {
   data: ConciergeResponse;
   config: TripConfig;
+  budgetPlan: BudgetPlan | null;
+  loadingBudget: boolean;
+  onAddItem: (item: ItineraryItem) => void;
+  addedIds: string[];
   onReoptimize: () => void;
 }
 
-export default function BudgetPanel({ data, config, onReoptimize }: Props) {
+export default function BudgetPanel({ data, config, budgetPlan, loadingBudget, onAddItem, addedIds, onReoptimize }: Props) {
   const budget = config.budget!;
-  const breakdown = data.resumo_orcamento;
-  const itinerary = data.roteiro_dia_a_dia ?? [];
+  const breakdown = budgetPlan?.resumo_orcamento;
+  const itinerary = budgetPlan?.roteiro_dia_a_dia ?? [];
 
   const total = breakdown?.total ?? 0;
   const diff = budget - total;
@@ -26,8 +31,90 @@ export default function BudgetPanel({ data, config, onReoptimize }: Props) {
       ]
     : [];
 
+  if (loadingBudget) {
+    return (
+      <div style={{ padding: '60px 0', textAlign: 'center' }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          border: '2px solid var(--border)', borderTop: '2px solid var(--gold)',
+          animation: 'spin-slow 1.2s linear infinite',
+          margin: '0 auto 20px',
+        }} />
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+          Montando seu roteiro dentro do orçamento…
+        </p>
+      </div>
+    );
+  }
+
+  if (!budgetPlan) {
+    return (
+      <div style={{ padding: '48px 0', textAlign: 'center' }}>
+        <p style={{ fontSize: 32, marginBottom: 12 }}>💰</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>
+          Nenhum plano disponível. Carregue uma viagem com orçamento definido.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
+
+      {/* ── Suggested Accommodation ─────────────────────────────────────── */}
+      {budgetPlan.hospedagem_sugerida && (
+        <div style={{
+          background: 'var(--gold-dim)',
+          border: '1px solid var(--gold-border)',
+          borderRadius: 12, padding: '16px 20px',
+          marginBottom: 20,
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ fontSize: 22 }}>🏨</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>
+              Hospedagem sugerida
+            </p>
+            <p style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>
+              {budgetPlan.hospedagem_sugerida}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const hotel = data.hospedagem.find(h => h.nome === budgetPlan.hospedagem_sugerida);
+              if (!hotel) return;
+              const id = `hosp-${hotel.nome}`;
+              if (!addedIds.includes(id)) {
+                onAddItem({ id, type: 'hospedagem', nome: hotel.nome, preco: hotel.diaria, descricao: hotel.descricao });
+              }
+            }}
+            className={addedIds.includes(`hosp-${budgetPlan.hospedagem_sugerida}`) ? '' : 'btn-gold'}
+            style={{
+              padding: '7px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600, flexShrink: 0,
+              ...(addedIds.includes(`hosp-${budgetPlan.hospedagem_sugerida}`)
+                ? { background: 'var(--teal-dim)', border: '1px solid var(--teal)', color: 'var(--teal)', cursor: 'default' }
+                : {}),
+            }}
+          >
+            {addedIds.includes(`hosp-${budgetPlan.hospedagem_sugerida}`) ? '✓ Adicionado' : '+ Roteiro'}
+          </button>
+        </div>
+      )}
+
+      {/* ── Concierge tip ───────────────────────────────────────────────── */}
+      {budgetPlan.dica_economia && (
+        <div style={{
+          background: 'var(--bg-surface)', border: '1px solid var(--border)',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 24,
+          display: 'flex', gap: 10, alignItems: 'flex-start',
+        }}>
+          <span>💡</span>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            <strong style={{ color: 'var(--gold)' }}>Dica de economia: </strong>
+            {budgetPlan.dica_economia}
+          </p>
+        </div>
+      )}
 
       {/* ── Budget Summary ──────────────────────────────────────────────── */}
       <div style={{

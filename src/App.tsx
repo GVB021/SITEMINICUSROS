@@ -8,9 +8,8 @@ type Screen = 'form' | 'loading' | 'panel' | 'error';
 
 // API keys from environment variables
 const API_KEYS: ApiKeys = {
-  gemini:     import.meta.env.VITE_GEMINI_KEY || '',
-  foursquare: import.meta.env.VITE_FOURSQUARE_KEY || '',
-  tavily:     import.meta.env.VITE_TAVILY_KEY || '',
+  gemini: import.meta.env.VITE_GEMINI_KEY || '',
+  tavily: import.meta.env.VITE_TAVILY_KEY || '',
 };
 
 export default function App() {
@@ -86,6 +85,7 @@ export default function App() {
           onRemoveItem={handleRemoveFromItinerary}
           onBack={() => setScreen('form')}
           onReoptimize={handleReoptimize}
+          apiKeys={API_KEYS}
         />
       )}
     </div>

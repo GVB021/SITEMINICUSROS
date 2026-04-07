@@ -1,137 +1,17 @@
-import type {
-  TripConfig,
-  ConciergeResponse,
-  FoursquarePlace,
-  TavilyCategoryResult,
-  EnrichmentData,
-} from './types';
+import type { TripConfig, ConciergeResponse, PlaceDetail } from './types';
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_PROXY_URL = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const FSQ_BASE = '/api/foursquare/v3/places';
-const TAVILY_BASE = '/api/tavily/search';
+const TAVILY_EXTRACT_URL = '/api/tavily/extract';
 
 const SYSTEM_PROMPT =
   'Você é um concierge de viagens brasileiro especialista e meticuloso. ' +
   'Responda APENAS com um objeto JSON válido. Sem markdown, sem blocos de código, sem texto antes ou depois. Apenas o JSON puro. ' +
-  'REGRA ABSOLUTA: inclua SOMENTE itens com preços reais estimados em reais (R$). Nunca invente preços ou locais que não existem.';
+  'REGRA ABSOLUTA: inclua SOMENTE estabelecimentos reais que possuem site oficial verificável na internet.'
 
-// ── Stage 1: Foursquare ────────────────────────────────────────────────────
+// ── Gemini-only prompt ─────────────────────────────────────────────────────
 
-const FSQ_CATEGORIES: Record<string, string> = {
-  hospedagem:   'pousada hotel',
-  restaurantes: 'restaurante',
-  atracoes:     'atração turística pontos turísticos',
-  eventos:      'show evento teatro',
-  experiencias: 'passeio experiência ecoturismo',
-};
-
-async function fetchPlacePhoto(fsqId: string, fsqKey: string): Promise<string | null> {
-  try {
-    const r = await fetch(`${FSQ_BASE}/${fsqId}/photos?limit=1`, {
-      headers: { Authorization: fsqKey },
-    });
-    if (!r.ok) return null;
-    const photos = await r.json();
-    if (!Array.isArray(photos) || photos.length === 0) return null;
-    return `${photos[0].prefix}300x200${photos[0].suffix}`;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchFoursquarePlaces(
-  destination: string,
-  fsqKey: string
-): Promise<Record<string, FoursquarePlace[]>> {
-  const results: Record<string, FoursquarePlace[]> = {};
-
-  await Promise.all(
-    Object.entries(FSQ_CATEGORIES).map(async ([category, query]) => {
-      try {
-        const params = new URLSearchParams({
-          query,
-          near: destination,
-          limit: '8',
-          fields: 'fsq_id,name,location,website,rating,price,hours,tel',
-        });
-        const r = await fetch(`${FSQ_BASE}/search?${params}`, {
-          headers: { Authorization: fsqKey },
-        });
-        if (!r.ok) { results[category] = []; return; }
-        const data = await r.json();
-        const places: FoursquarePlace[] = data.results ?? [];
-
-        // Fetch one photo per place (up to 4 in parallel to avoid throttling)
-        const withPhotos = await Promise.all(
-          places.slice(0, 8).map(async (p) => ({
-            ...p,
-            photo_url: await fetchPlacePhoto(p.fsq_id, fsqKey),
-          }))
-        );
-        results[category] = withPhotos;
-      } catch {
-        results[category] = [];
-      }
-    })
-  );
-
-  return results;
-}
-
-// ── Stage 2: Tavily Search ─────────────────────────────────────────────────
-
-const TAVILY_QUERIES: Record<string, (dest: string, dates: string) => string> = {
-  hospedagem:   (d, _)  => `diária preço pousada hotel ${d} 2026`,
-  restaurantes: (d, _)  => `cardápio preços restaurante ${d} 2026`,
-  atracoes:     (d, _)  => `ingresso entrada atração turística ${d} 2026`,
-  eventos:      (d, dt) => `shows eventos ${d} ${dt} ingresso preço`,
-  experiencias: (d, _)  => `passeio ecoturismo experiência preço ${d} 2026`,
-};
-
-async function fetchTavilyPrices(
-  destination: string,
-  dates: string,
-  tavilyKey: string
-): Promise<TavilyCategoryResult[]> {
-  const entries = Object.entries(TAVILY_QUERIES);
-
-  const results = await Promise.all(
-    entries.map(async ([category, buildQuery]) => {
-      const query = buildQuery(destination, dates);
-      try {
-        const r = await fetch(TAVILY_BASE, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${tavilyKey}`,
-          },
-          body: JSON.stringify({
-            query,
-            search_depth: 'basic',
-            max_results: 5,
-          }),
-        });
-        if (!r.ok) return { category, query, results: [] };
-        const data = await r.json();
-        const webResults = (data.results ?? []).map((item: { title: string; url: string; content: string }) => ({
-          title: item.title,
-          url: item.url,
-          description: item.content,
-        }));
-        return { category, query, results: webResults };
-      } catch {
-        return { category, query, results: [] };
-      }
-    })
-  );
-
-  return results;
-}
-
-// ── Prompt with enrichment data ────────────────────────────────────────────
-
-function buildEnrichedPrompt(config: TripConfig, enrichment: EnrichmentData): string {
+function buildGeminiDirectPrompt(config: TripConfig): string {
   const nights = Math.max(
     1,
     Math.ceil(
@@ -152,259 +32,336 @@ function buildEnrichedPrompt(config: TripConfig, enrichment: EnrichmentData): st
 
   const perfil = profileLabels[config.profile];
   const tiposViagem = config.types.map((t) => typeLabels[t]).join(', ');
-  const budgetInfo = config.budget
-    ? `Orçamento total: R$ ${config.budget.toLocaleString('pt-BR')} para ${config.people} pessoa(s). Monte roteiro dia a dia dentro desse orçamento.`
+  const budgetConstraint = config.budget
+    ? `\nORÇAMENTO: R$ ${config.budget.toLocaleString('pt-BR')} total para ${config.people} pessoa(s) por ${nights} noite(s). Priorize opções acessíveis — hospedagem ideal até R$ ${Math.round(config.budget * 0.4 / nights).toLocaleString('pt-BR')}/noite, refeições até R$ ${Math.round(config.budget * 0.2 / config.people / nights).toLocaleString('pt-BR')}/pessoa. Inclua variedade de preços mas liste as opções mais econômicas primeiro.`
     : '';
 
-  const fsqSummary = Object.entries(enrichment.foursquare)
-    .map(([cat, places]) => {
-      if (!places.length) return '';
-      const items = places.map(p =>
-        `- ${p.name} | endereço: ${p.location.formatted_address ?? 'N/A'} | rating: ${p.rating ?? 'N/A'} | website: ${p.website ?? 'N/A'} | horário: ${p.hours?.display ?? 'N/A'} | foto: ${p.photo_url ?? 'N/A'}`
-      ).join('\n');
-      return `${cat.toUpperCase()}:\n${items}`;
-    }).filter(Boolean).join('\n\n');
-
-  const tavilySummary = enrichment.tavily
-    .map(t => {
-      if (!t.results.length) return '';
-      const snippets = t.results.map(r => `  [${r.title}] ${r.description} (${r.url})`).join('\n');
-      return `${t.category.toUpperCase()} — query: "${t.query}":\n${snippets}`;
-    }).filter(Boolean).join('\n\n');
-
-  return `Retorne SOMENTE um objeto JSON, sem nenhum texto, sem markdown, sem explicações. Apenas { } JSON puro.
+  return `Retorne SOMENTE um objeto JSON puro. Sem markdown, sem blocos de código, sem texto antes ou depois.
 
 Dados da viagem:
 - Destino: ${config.destination}
 - Período: ${config.checkIn} a ${config.checkOut} (${nights} noite(s))
 - Pessoas: ${config.people}
 - Perfil: ${perfil}
-- Tipo: ${tiposViagem}
-${budgetInfo}
+- Tipo: ${tiposViagem}${budgetConstraint}
 
-=== LOCAIS REAIS DO FOURSQUARE (use estes nomes e dados) ===
-${fsqSummary || 'Nenhum dado disponível — use seu conhecimento do destino.'}
+REGRAS CRÍTICAS (seguir à risca):
+1. Inclua SOMENTE estabelecimentos REAIS que existem em ${config.destination}
+2. "site_oficial" — inclua SE você conhecer a URL real (ex: "https://www.pousadaxyz.com.br"). Se não souber, deixe null. NÃO invente URLs
+3. "foto_url" — se souber a URL de uma foto real, inclua. Caso contrário, deixe null
+4. "telefone" — inclua o telefone real se conhecer, senão null
+5. NUNCA invente URLs, telefones ou nomes de lugares que não existem
+6. Inclua o máximo de opções reais que você conhece do destino, com ou sem site_oficial
+7. "descricao" deve ser precisa e baseada em fatos reais do lugar
 
-=== PREÇOS E INFORMAÇÕES DA WEB (Tavily Search) ===
-${tavilySummary || 'Nenhum dado disponível — estime com base no perfil do destino.'}
+QUANTIDADE (não exceder):
+- Hospedagem: 5-7 opções
+- Restaurantes: 6-8 opções
+- Atrações: 5-7 opções
+- Experiências: 3-5 opções
+- Transporte: 2-3 opções
+- Eventos: apenas os que realmente ocorrem no período ${config.checkIn} a ${config.checkOut}
 
-REGRAS CRÍTICAS:
-1. Use os nomes EXATOS dos locais do Foursquare quando disponíveis
-2. Para preços: extraia valores reais dos snippets do Tavily Search. Se encontrar preço nos snippets, preencha "preco_reais" com o valor numérico e "fonte_preco" com a URL de origem
-3. Se não encontrou preço real nos snippets, use "preco_reais": null e "fonte_preco": "consulte o local"
-4. SEMPRE inclua os campos "foto_url", "website", "rating" dos dados do Foursquare quando disponíveis (mesmo se null)
-5. Não invente dados — use apenas informações dos snippets fornecidos ou seu conhecimento verificável
+DESCRIÇÕES CURTAS: máximo 20 palavras por campo descricao, perfil_ideal, prato_estrela, destaque.
 
-JSON esperado:
-{
-  "destino": "${config.destination}",
-  "clima_estimado": "...",
-  "descricao_destino": "...",
-  "dica_concierge": "...",
-  "hospedagem": [
-    {
-      "nome": "nome do Foursquare",
-      "tipo": "pousada|hotel|chalé|hostel",
-      "diaria": 350,
-      "preco_reais": 350,
-      "fonte_preco": "https://...",
-      "descricao": "...",
-      "perfil_ideal": "...",
-      "destaque": "...",
-      "foto_url": "url da foto do Foursquare ou null",
-      "website": "url do website ou null",
-      "rating": 8.5
-    }
-  ],
-  "restaurantes": [
-    {
-      "nome": "nome do Foursquare",
-      "cozinha": "...",
-      "preco_por_pessoa": 80,
-      "preco_reais": 80,
-      "fonte_preco": "https://...",
-      "prato_estrela": "...",
-      "horario": "...",
-      "descricao": "...",
-      "foto_url": null,
-      "website": null,
-      "rating": null
-    }
-  ],
-  "atracoes": [
-    {
-      "nome": "nome do Foursquare",
-      "preco": 40,
-      "preco_reais": 40,
-      "fonte_preco": "https://...",
-      "duracao": "2h",
-      "perfil_ideal": "...",
-      "descricao": "...",
-      "foto_url": null,
-      "website": null,
-      "rating": null
-    }
-  ],
-  "eventos": [
-    {
-      "nome": "...",
-      "data": "${config.checkIn}",
-      "preco": 60,
-      "preco_reais": 60,
-      "fonte_preco": "https://...",
-      "local": "...",
-      "descricao": "..."
-    }
-  ],
-  "transporte": [
-    { "tipo": "...", "descricao": "...", "valor": 30 }
-  ],
-  "experiencias": [
-    {
-      "nome": "nome do Foursquare",
-      "preco_por_pessoa": 150,
-      "preco_reais": 150,
-      "fonte_preco": "https://...",
-      "duracao": "3h",
-      "descricao": "...",
-      "foto_url": null,
-      "website": null
-    }
-  ]${
-    config.budget
-      ? `,
-  "roteiro_dia_a_dia": [
-    {
-      "dia": 1,
-      "data": "${config.checkIn}",
-      "manha": "...",
-      "tarde": "...",
-      "noite": "...",
-      "custo_estimado": 200
-    }
-  ],
-  "resumo_orcamento": {
-    "hospedagem": 0, "alimentacao": 0, "passeios": 0,
-    "transporte": 0, "eventos": 0, "experiencias": 0, "total": 0
-  }`
-      : ''
+CAMPOS POR ARRAY:
+- hospedagem[]: nome, tipo, diaria(number), descricao, perfil_ideal, destaque, foto_url, site_oficial, telefone, rating
+- restaurantes[]: nome, cozinha, preco_por_pessoa(number), prato_estrela, horario, descricao, foto_url, site_oficial, telefone, rating
+- atracoes[]: nome, preco(number), duracao, perfil_ideal, descricao, foto_url, site_oficial, telefone, rating
+- eventos[]: nome, data, preco(number), local, descricao, foto_url, site_oficial, telefone
+- transporte[]: tipo, descricao, valor(number)
+- experiencias[]: nome, preco_por_pessoa(number), duracao, descricao, foto_url, site_oficial, telefone
+
+Campos raiz: destino, clima_estimado, descricao_destino, dica_concierge
+
+Priorize o perfil "${perfil}" e tipo "${tiposViagem}".`;
+}
+
+// ── Tavily Extract + Gemini parse ──────────────────────────────────────────
+
+async function extractWithTavily(url: string, tavilyKey: string): Promise<string> {
+  try {
+    const r = await fetch(TAVILY_EXTRACT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tavilyKey}`,
+      },
+      body: JSON.stringify({ urls: [url] }),
+    });
+    if (!r.ok) return '';
+    const data = await r.json();
+    const result = data.results?.[0];
+    return result?.raw_content ?? result?.content ?? '';
+  } catch {
+    return '';
   }
 }
 
-QUANTIDADE MÍNIMA OBRIGATÓRIA (não negocie estes números):
-- 12 hospedagens (pousadas, hotéis, chalés, hostels em diferentes faixas de preço)
-- 15 restaurantes (diversas cozinhas: brasileira, italiana, pizza, contemporânea, regional, etc)
-- 12 atrações (mix de pagas e gratuitas: natureza, cultura, aventura, mirantes)
-- 6 experiências únicas (passeios, ecoturismo, atividades especiais)
-- 3 opções de transporte
-- 4 eventos (se houver no período; caso contrário, retorne array vazio)
+function buildDetailParsePrompt(
+  nome: string,
+  categoria: string,
+  siteUrl: string,
+  rawContent: string
+): string {
+  const categoryInstructions: Record<string, string> = {
+    hospedagem: `Extraia do conteúdo:
+- "quartos": array de tipos de quarto com tipo, preco (R$/noite), descricao, capacidade
+- "comodidades": array de strings (wifi, piscina, café da manhã, etc)
+- "checkin" e "checkout": horários
+- "telefone": número de telefone para reservas
+- "endereco": endereço completo
+- "horario": horário de atendimento se disponível`,
+    restaurante: `Extraia do conteúdo:
+- "menu": array de seções com { secao: string, itens: [{ nome, descricao, preco }] }
+- "telefone": número para reservas
+- "horario": dias e horários de funcionamento
+- "endereco": endereço completo`,
+    atracao: `Extraia do conteúdo:
+- "ingressos": array de tipos [{ tipo, preco, descricao }]
+- "horario": dias e horários de funcionamento
+- "duracao": tempo médio de visita
+- "como_chegar": instruções de acesso
+- "telefone": contato`,
+    evento: `Extraia do conteúdo:
+- "ingressos": array de lotes/setores [{ tipo, preco, descricao }]
+- "horario": data e hora do evento
+- "endereco": local do evento
+- "telefone": contato`,
+    experiencia: `Extraia do conteúdo:
+- "ingressos": array de pacotes/opções [{ tipo, preco, descricao }]
+- "duracao": duração da experiência
+- "horario": horários disponíveis
+- "telefone": contato para reserva
+- "como_chegar": ponto de encontro`,
+  };
 
-INSTRUÇÕES CRÍTICAS PARA QUANTIDADE:
-1. Use TODOS os dados do Foursquare fornecidos acima (geralmente 8 por categoria)
-2. Se Foursquare trouxer 8 e você precisa de 12-15, COMPLETE com estabelecimentos reais e conhecidos do destino ${config.destination}
-3. Cada opção adicional DEVE ter: nome real verificável, tipo/cozinha, descrição realista, preço estimado baseado no perfil do destino
-4. Para itens do Foursquare: mantenha foto_url, website, rating
-5. Para itens que você adicionar: deixe foto_url: null, website: null, rating: null
-6. NUNCA invente nomes genéricos como "Restaurante Centro" ou "Hotel Local" - use nomes reais de estabelecimentos
-7. Priorize diversidade: varie preços, estilos, localizações dentro do destino
+  const instructions = categoryInstructions[categoria] ?? categoryInstructions['atracao'];
 
-Priorize opções para o perfil "${perfil}" e tipo "${tiposViagem}".`;
+  return `Analise o conteúdo extraído do site oficial de "${nome}" (${siteUrl}) e retorne um JSON estruturado.
+
+Conteúdo extraído:
+---
+${rawContent.slice(0, 6000)}
+---
+
+${instructions}
+- "descricao_completa": descrição detalhada do lugar (2-4 frases)
+- "fotos": array de URLs de imagens encontradas no conteúdo (máximo 4)
+
+Se um campo não for encontrado no conteúdo, use null.
+Retorne APENAS JSON puro, sem markdown:
+{
+  "nome": "${nome}",
+  "site_oficial": "${siteUrl}",
+  "telefone": null,
+  "endereco": null,
+  "horario": null,
+  "descricao_completa": null,
+  "fotos": [],
+  "quartos": [],
+  "comodidades": [],
+  "checkin": null,
+  "checkout": null,
+  "menu": [],
+  "ingressos": [],
+  "duracao": null,
+  "como_chegar": null
+}`;
 }
 
 export interface ApiKeys {
   gemini: string;
-  foursquare: string;
   tavily: string;
 }
 
-async function callGemini(prompt: string, geminiKey: string): Promise<ConciergeResponse> {
+function buildGeminiKnowledgePrompt(nome: string, categoria: string, destination: string): string {
+  const categoryInstructions: Record<string, string> = {
+    hospedagem: `- "quartos": 3-5 tipos de quarto típicos com tipo, preco (R$/noite estimado), descricao, capacidade
+- "comodidades": array de comodidades típicas do local (wifi, piscina, café, etc)
+- "checkin": horário típico de check-in
+- "checkout": horário típico de check-out`,
+    restaurante: `- "menu": 2-3 seções do menu com itens típicos { secao, itens: [{ nome, descricao, preco }] }
+- "horario": horário de funcionamento típico`,
+    atracao: `- "ingressos": tipos de ingresso com preços estimados [{ tipo, preco, descricao }]
+- "horario": horário de funcionamento
+- "duracao": tempo médio de visita
+- "como_chegar": como chegar ao local`,
+    evento: `- "ingressos": tipos de ingresso [{ tipo, preco, descricao }]
+- "horario": horário do evento`,
+    experiencia: `- "ingressos": pacotes disponíveis [{ tipo, preco, descricao }]
+- "duracao": duração da experiência
+- "como_chegar": ponto de encontro`,
+  };
+  const instructions = categoryInstructions[categoria] ?? categoryInstructions['atracao'];
+
+  return `Com base no seu conhecimento de treinamento, forneça detalhes realistas sobre "${nome}", um(a) ${categoria} em ${destination}.
+
+Retorne JSON puro sem markdown:
+{
+  "nome": "${nome}",
+  "site_oficial": null,
+  "descricao_completa": "descrição detalhada em 2-3 frases",
+  "telefone": null,
+  "endereco": null,
+  "horario": null,
+  "fotos": [],
+  "quartos": [],
+  "comodidades": [],
+  "checkin": null,
+  "checkout": null,
+  "menu": [],
+  "ingressos": [],
+  "duracao": null,
+  "como_chegar": null
+}
+
+${instructions}
+
+Use valores estimados realistas para ${destination}. Se não souber detalhes específicos, deixe null.`;
+}
+
+export async function extractPlaceDetails(
+  nome: string,
+  categoria: string,
+  siteOficial: string,
+  keys: ApiKeys,
+  destination = ''
+): Promise<PlaceDetail> {
+  const rawContent = await extractWithTavily(siteOficial, keys.tavily);
+
+  if (rawContent) {
+    const prompt = buildDetailParsePrompt(nome, categoria, siteOficial, rawContent);
+    try {
+      const detail = await callGeminiRaw<PlaceDetail>(prompt, keys.gemini);
+      return { ...detail, nome, site_oficial: siteOficial };
+    } catch {
+      // fall through to Gemini knowledge fallback
+    }
+  }
+
+  // Gemini knowledge fallback — always returns useful content
+  const fallbackPrompt = buildGeminiKnowledgePrompt(nome, categoria, destination || siteOficial);
+  try {
+    const detail = await callGeminiRaw<PlaceDetail>(fallbackPrompt, keys.gemini);
+    return { ...detail, nome, site_oficial: siteOficial };
+  } catch {
+    return { nome, site_oficial: siteOficial };
+  }
+}
+
+// ── Shared Gemini JSON parser ───────────────────────────────────────────────
+
+async function callGeminiRaw<T>(prompt: string, geminiKey: string, maxTokens = 4096): Promise<T> {
   const url = `${GEMINI_PROXY_URL}?key=${encodeURIComponent(geminiKey)}`;
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-        response_mime_type: 'application/json',
-      },
+      generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens, response_mime_type: 'application/json' },
     }),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const errorMsg =
-      (errorData as { error?: { message?: string } })?.error?.message ||
-      `HTTP ${response.status}`;
-    throw new Error(`Erro na API Gemini: ${errorMsg}`);
+    const msg = (errorData as { error?: { message?: string } })?.error?.message || `HTTP ${response.status}`;
+    console.error('[Gemini] HTTP error:', msg);
+    throw new Error(`Erro na API Gemini: ${msg}`);
   }
 
   const data = await response.json();
+  const finishReason = data.candidates?.[0]?.finishReason;
   const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
   if (!rawText) {
-    console.error('Gemini response:', JSON.stringify(data));
-    throw new Error('A API não retornou conteúdo. Verifique sua chave e tente novamente.');
+    console.error('[Gemini] Empty response. Full data:', JSON.stringify(data));
+    throw new Error('A API não retornou conteúdo. Verifique sua chave.');
   }
 
-  // Strip markdown fences
-  const cleaned = rawText
-    .replace(/```json/gi, '')
-    .replace(/```/g, '')
-    .trim();
+  if (finishReason === 'MAX_TOKENS') {
+    console.warn('[Gemini] Response truncated by MAX_TOKENS. Increase maxOutputTokens.');
+  }
 
-  // Find the last complete { ... } block — model may emit chain-of-thought before the JSON
+  console.log(`[Gemini] finishReason=${finishReason}, chars=${rawText.length}, maxTokens=${maxTokens}`);
+
+  const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
   const end = cleaned.lastIndexOf('}');
-  if (end === -1) {
-    console.error('Raw Gemini response:', rawText);
-    throw new Error('A API não retornou um JSON válido. Tente novamente.');
-  }
+  if (end === -1) throw new Error('JSON inválido.');
 
-  // Walk backwards from the last } to find its matching opening {
-  let depth = 0;
-  let start = -1;
+  let depth = 0, start = -1;
   for (let i = end; i >= 0; i--) {
     if (cleaned[i] === '}') depth++;
-    else if (cleaned[i] === '{') {
-      depth--;
-      if (depth === 0) { start = i; break; }
-    }
+    else if (cleaned[i] === '{') { depth--; if (depth === 0) { start = i; break; } }
   }
+  if (start === -1) throw new Error('JSON inválido.');
 
-  if (start === -1) {
-    console.error('Raw Gemini response:', rawText);
-    throw new Error('A API não retornou um JSON válido. Tente novamente.');
-  }
+  return JSON.parse(cleaned.slice(start, end + 1)) as T;
+}
 
-  const jsonStr = cleaned.slice(start, end + 1);
-
-  try {
-    return JSON.parse(jsonStr) as ConciergeResponse;
-  } catch {
-    console.error('Raw Gemini response:', rawText);
-    throw new Error('A API retornou um formato inválido. Tente novamente.');
-  }
+async function callGemini(prompt: string, geminiKey: string): Promise<ConciergeResponse> {
+  return callGeminiRaw<ConciergeResponse>(prompt, geminiKey, 32768);
 }
 
 export async function fetchConciergeData(
   config: TripConfig,
   keys: ApiKeys
 ): Promise<ConciergeResponse> {
-  const dates = `${config.checkIn} a ${config.checkOut}`;
-
-  // Stage 1 + 2 in parallel — both are independent
-  const [foursquareData, tavilyData] = await Promise.all([
-    keys.foursquare ? fetchFoursquarePlaces(config.destination, keys.foursquare) : Promise.resolve({}),
-    keys.tavily ? fetchTavilyPrices(config.destination, dates, keys.tavily) : Promise.resolve([]),
-  ]);
-
-  // Stage 3 — Gemini with enriched context
-  const enrichment: EnrichmentData = { foursquare: foursquareData, tavily: tavilyData };
-  const prompt = buildEnrichedPrompt(config, enrichment);
+  const prompt = buildGeminiDirectPrompt(config);
   return callGemini(prompt, keys.gemini);
+}
+
+// ── Budget plan (separate call) ────────────────────────────────────────────
+
+export interface BudgetPlan {
+  hospedagem_sugerida: string;
+  restaurantes_sugeridos: string[];
+  roteiro_dia_a_dia: import('./types').DayItinerary[];
+  resumo_orcamento: import('./types').BudgetBreakdown;
+  dica_economia?: string;
+}
+
+function buildBudgetPlanPrompt(config: TripConfig, listedItems: ConciergeResponse): string {
+  const nights = Math.max(
+    1,
+    Math.ceil((new Date(config.checkOut).getTime() - new Date(config.checkIn).getTime()) / 86400000)
+  );
+
+  const hotels = (listedItems.hospedagem ?? []).map(h => `${h.nome} (R$${h.diaria}/noite)`).join(', ');
+  const restaurants = (listedItems.restaurantes ?? []).map(r => `${r.nome} (R$${r.preco_por_pessoa}/pessoa)`).join(', ');
+  const attractions = (listedItems.atracoes ?? []).map(a => `${a.nome} (R$${a.preco})`).join(', ');
+  const experiences = (listedItems.experiencias ?? []).map(x => `${x.nome} (R$${x.preco_por_pessoa}/pessoa)`).join(', ');
+  const transport = (listedItems.transporte ?? []).map(t => `${t.tipo} (R$${t.valor})`).join(', ');
+
+  return `Retorne SOMENTE JSON puro. Sem markdown.
+
+Viagem: ${config.destination}, ${nights} noite(s), ${config.people} pessoa(s).
+Orçamento TOTAL: R$ ${config.budget!.toLocaleString('pt-BR')}. NÃO ultrapasse esse valor.
+
+Opções disponíveis:
+Hospedagem: ${hotels}
+Restaurantes: ${restaurants}
+Atrações: ${attractions}
+Experiências: ${experiences}
+Transporte: ${transport}
+
+Monte o melhor roteiro completo dentro do orçamento. Selecione 1 hospedagem, refeições e passeios para cada dia.
+
+Campos obrigatórios:
+- hospedagem_sugerida: nome exato da hospedagem escolhida (string)
+- restaurantes_sugeridos: array de nomes escolhidos
+- roteiro_dia_a_dia[]: dia(number), data, manha, tarde, noite, custo_estimado(number)
+- resumo_orcamento{}: hospedagem, alimentacao, passeios, transporte, eventos, experiencias, total (todos numbers, total ≤ R$${config.budget})
+- dica_economia: dica rápida para economizar`;
+}
+
+export async function fetchBudgetPlan(
+  config: TripConfig,
+  listedItems: ConciergeResponse,
+  keys: ApiKeys
+): Promise<BudgetPlan> {
+  const prompt = buildBudgetPlanPrompt(config, listedItems);
+  return callGeminiRaw<BudgetPlan>(prompt, keys.gemini, 8192);
 }
