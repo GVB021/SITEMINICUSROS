@@ -8,6 +8,9 @@ const GEMINI_PROXY_URL = import.meta.env.DEV
 const TAVILY_EXTRACT_URL = import.meta.env.DEV
   ? '/api/tavily/extract'
   : 'https://api.tavily.com/extract';
+const TAVILY_SEARCH_URL = import.meta.env.DEV
+  ? '/api/tavily/search'
+  : 'https://api.tavily.com/search';
 
 const SYSTEM_PROMPT =
   'Você é um concierge de viagens brasileiro especialista e meticuloso. ' +
@@ -264,6 +267,35 @@ export async function extractPlaceDetails(
   } catch {
     const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(nome)}+${encodeURIComponent(destination)}`;
     return { nome, site_oficial: siteOficial ?? null, source: 'knowledge', google_maps_url: mapsUrl };
+  }
+}
+
+// ── Tavily image search ────────────────────────────────────────────────────
+
+export async function searchPlacePhoto(
+  nome: string,
+  destination: string,
+  tavilyKey: string
+): Promise<string | null> {
+  try {
+    const r = await fetch(TAVILY_SEARCH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tavilyKey}`,
+      },
+      body: JSON.stringify({
+        query: `${nome} ${destination}`,
+        include_images: true,
+        max_results: 3,
+      }),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const images = (data.images ?? []) as string[];
+    return images.find(u => typeof u === 'string' && u.startsWith('http')) ?? null;
+  } catch {
+    return null;
   }
 }
 

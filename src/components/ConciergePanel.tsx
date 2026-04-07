@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ConciergeResponse, TripConfig, ItineraryItem, PlaceDetail, ItineraryItemType } from '../types';
-import { extractPlaceDetails, fetchBudgetPlan, type ApiKeys, type BudgetPlan } from '../api';
+import { extractPlaceDetails, fetchBudgetPlan, searchPlacePhoto, type ApiKeys, type BudgetPlan } from '../api';
 import { getDestinationPhoto } from '../constants/destinations';
 import { computeNights } from '../utils/dates';
 import ErrorBoundary from './ErrorBoundary';
@@ -29,6 +29,40 @@ export default function ConciergePanel({
   const [budgetPlan, setBudgetPlan] = useState<BudgetPlan | null>(null);
   const [loadingBudget, setLoadingBudget] = useState(false);
   const [budgetError, setBudgetError] = useState<string | null>(null);
+
+  const [photoMap, setPhotoMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!data || !apiKeys.tavily) return;
+    type PhotoItem = { id: string; nome: string; foto_url?: string | null };
+    const allItems: PhotoItem[] = [
+      ...(data.hospedagem  ?? []).map(h => ({ id: `hosp-${h.nome}`,              nome: h.nome, foto_url: h.foto_url })),
+      ...(data.restaurantes ?? []).map(r => ({ id: `rest-${r.nome}`,             nome: r.nome, foto_url: r.foto_url })),
+      ...(data.atracoes     ?? []).map(a => ({ id: `atr-${a.nome}`,              nome: a.nome, foto_url: a.foto_url })),
+      ...(data.eventos      ?? []).map(e => ({ id: `evt-${e.nome}`,              nome: e.nome, foto_url: e.foto_url })),
+      ...(data.experiencias ?? []).map(x => ({ id: `exp-${x.nome}`,             nome: x.nome, foto_url: x.foto_url })),
+      ...(data.transporte   ?? []).map(t => ({ id: `transp-${t.nome ?? t.tipo}`, nome: t.nome ?? t.tipo, foto_url: null })),
+    ];
+    const needsPhoto = allItems.filter(i => !i.foto_url);
+    if (needsPhoto.length === 0) return;
+    let cancelled = false;
+    Promise.allSettled(
+      needsPhoto.map(item =>
+        searchPlacePhoto(item.nome, config.destination, apiKeys.tavily)
+          .then(url => ({ id: item.id, url }))
+      )
+    ).then(results => {
+      if (cancelled) return;
+      const map: Record<string, string> = {};
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value.url) {
+          map[r.value.id] = r.value.url;
+        }
+      }
+      if (Object.keys(map).length > 0) setPhotoMap(prev => ({ ...prev, ...map }));
+    });
+    return () => { cancelled = true; };
+  }, [data, config.destination, apiKeys.tavily]);
 
   useEffect(() => {
     if (!config.budget || !apiKeys.gemini) return;
@@ -253,6 +287,7 @@ export default function ConciergePanel({
 
         {activeTab === 'hospedagem' && (
           <CategorySection
+            photoMap={photoMap}
             items={data.hospedagem?.map((h) => ({
               id: `hosp-${h.nome}`,
               type: 'hospedagem' as const,
@@ -277,6 +312,7 @@ export default function ConciergePanel({
 
         {activeTab === 'restaurantes' && (
           <CategorySection
+            photoMap={photoMap}
             items={data.restaurantes?.map((r) => ({
               id: `rest-${r.nome}`,
               type: 'restaurante' as const,
@@ -301,6 +337,7 @@ export default function ConciergePanel({
 
         {activeTab === 'atracoes' && (
           <CategorySection
+            photoMap={photoMap}
             items={data.atracoes?.map((a) => ({
               id: `atr-${a.nome}`,
               type: 'atracao' as const,
@@ -324,6 +361,7 @@ export default function ConciergePanel({
 
         {activeTab === 'eventos' && (
           <CategorySection
+            photoMap={photoMap}
             items={data.eventos?.map((e) => ({
               id: `evt-${e.nome}`,
               type: 'evento' as const,
@@ -346,6 +384,7 @@ export default function ConciergePanel({
 
         {activeTab === 'transporte' && (
           <CategorySection
+            photoMap={photoMap}
             items={data.transporte?.map((t) => ({
               id: `transp-${t.nome ?? t.tipo}`,
               type: 'transporte' as const,
@@ -365,6 +404,7 @@ export default function ConciergePanel({
 
         {activeTab === 'experiencias' && (
           <CategorySection
+            photoMap={photoMap}
             items={data.experiencias?.map((x) => ({
               id: `exp-${x.nome}`,
               type: 'experiencia' as const,

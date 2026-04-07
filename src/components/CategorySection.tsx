@@ -24,6 +24,7 @@ interface Props {
   onViewDetails: (item: CardItem) => Promise<PlaceDetail | null>;
   addedIds: string[];
   emptyMessage?: string;
+  photoMap?: Record<string, string>;
 }
 
 const typeIcons: Record<ItineraryItemType, string> = {
@@ -83,7 +84,7 @@ export function CategorySkeleton() {
   );
 }
 
-export default function CategorySection({ items, onAdd, onViewDetails, addedIds, emptyMessage }: Props) {
+export default function CategorySection({ items, onAdd, onViewDetails, addedIds, emptyMessage, photoMap }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
   const [detailMap, setDetailMap] = useState<Record<string, PlaceDetail | null>>({});
@@ -164,77 +165,93 @@ export default function CategorySection({ items, onAdd, onViewDetails, addedIds,
               }}
             >
               {/* ── Image with vignette overlay ──────────────────── */}
-              <div style={{ position: 'relative', height: 220, overflow: 'hidden', background: 'var(--bg-surface)', flexShrink: 0 }}>
-                <img
-                  src={item.foto_url || getFallbackImage(item.type, item.nome)}
-                  alt={item.nome}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.4s' }}
-                  onError={e => {
-                    const img = e.currentTarget as HTMLImageElement;
-                    if (!img.src.includes('images.unsplash.com')) img.src = getFallbackImage(item.type, item.nome);
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.04)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1)'; }}
-                />
-                {/* Gradient vignette */}
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 40%, rgba(0,0,0,0.5) 100%)',
-                  pointerEvents: 'none',
-                }} />
-                {/* Type icon — top left */}
-                <div style={{
-                  position: 'absolute', top: 10, left: 10,
-                  background: 'rgba(0,0,0,0.55)',
-                  backdropFilter: 'blur(6px)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 8, padding: '3px 9px',
-                  fontSize: 13, fontWeight: 600,
-                  color: 'white',
-                }}>
-                  {typeIcons[item.type]}
-                </div>
-                {/* Rating — top right */}
-                {item.rating != null && (
-                  <div style={{
-                    position: 'absolute', top: 10, right: 10,
-                    background: 'rgba(0,0,0,0.6)',
-                    backdropFilter: 'blur(6px)',
-                    border: '1px solid rgba(201,169,110,0.4)',
-                    borderRadius: 8, padding: '3px 10px',
-                    display: 'flex', alignItems: 'center', gap: 4,
-                  }}>
-                    <span style={{ fontSize: 12, color: 'var(--gold)' }}>★</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold-light)' }}>
-                      {item.rating.toFixed(1)}
-                    </span>
+              {(() => {
+                const realPhoto = photoMap?.[item.id];
+                const src = realPhoto ?? item.foto_url ?? getFallbackImage(item.type, item.nome);
+                const isRealLoading = !realPhoto && !!photoMap && !(item.id in photoMap) && !item.foto_url;
+                return (
+                  <div style={{ position: 'relative', height: 220, overflow: 'hidden', background: 'var(--bg-surface)', flexShrink: 0 }}>
+                    {isRealLoading && (
+                      <div className="skeleton" style={{ position: 'absolute', inset: 0, zIndex: 1 }} />
+                    )}
+                    <img
+                      src={src}
+                      alt={item.nome}
+                      style={{
+                        width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                        transition: 'transform 0.4s, opacity 0.4s',
+                        opacity: isRealLoading ? 0 : 1,
+                      }}
+                      onLoad={e => { (e.currentTarget as HTMLImageElement).style.opacity = '1'; }}
+                      onError={e => {
+                        const img = e.currentTarget as HTMLImageElement;
+                        if (!img.src.includes('images.unsplash.com')) img.src = getFallbackImage(item.type, item.nome);
+                        img.style.opacity = '1';
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.04)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1)'; }}
+                    />
+                    {/* Gradient vignette */}
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 40%, rgba(0,0,0,0.5) 100%)',
+                      pointerEvents: 'none',
+                    }} />
+                    {/* Type icon — top left */}
+                    <div style={{
+                      position: 'absolute', top: 10, left: 10,
+                      background: 'rgba(0,0,0,0.55)',
+                      backdropFilter: 'blur(6px)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 8, padding: '3px 9px',
+                      fontSize: 13, fontWeight: 600,
+                      color: 'white',
+                    }}>
+                      {typeIcons[item.type]}
+                    </div>
+                    {/* Rating — top right */}
+                    {item.rating != null && (
+                      <div style={{
+                        position: 'absolute', top: 10, right: 10,
+                        background: 'rgba(0,0,0,0.6)',
+                        backdropFilter: 'blur(6px)',
+                        border: '1px solid rgba(201,169,110,0.4)',
+                        borderRadius: 8, padding: '3px 10px',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}>
+                        <span style={{ fontSize: 12, color: 'var(--gold)' }}>★</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold-light)' }}>
+                          {item.rating.toFixed(1)}
+                        </span>
+                      </div>
+                    )}
+                    {/* Price badge — bottom left over image */}
+                    <div style={{
+                      position: 'absolute', bottom: 10, left: 10,
+                      background: 'rgba(10,11,14,0.85)',
+                      backdropFilter: 'blur(8px)',
+                      border: '1px solid var(--gold-border)',
+                      borderRadius: 8, padding: '4px 12px',
+                    }}>
+                      <span className="text-gold-gradient" style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-display)' }}>
+                        {item.badge}
+                      </span>
+                    </div>
+                    {/* Added checkmark — bottom right */}
+                    {isAdded && (
+                      <div style={{
+                        position: 'absolute', bottom: 10, right: 10,
+                        background: 'rgba(78,205,196,0.15)',
+                        border: '1px solid rgba(78,205,196,0.4)',
+                        borderRadius: 8, padding: '4px 10px',
+                        fontSize: 11, color: 'var(--teal)', fontWeight: 600,
+                      }}>
+                        ✓ No Roteiro
+                      </div>
+                    )}
                   </div>
-                )}
-                {/* Price badge — bottom left over image */}
-                <div style={{
-                  position: 'absolute', bottom: 10, left: 10,
-                  background: 'rgba(10,11,14,0.85)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid var(--gold-border)',
-                  borderRadius: 8, padding: '4px 12px',
-                }}>
-                  <span className="text-gold-gradient" style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-display)' }}>
-                    {item.badge}
-                  </span>
-                </div>
-                {/* Added checkmark — bottom right */}
-                {isAdded && (
-                  <div style={{
-                    position: 'absolute', bottom: 10, right: 10,
-                    background: 'rgba(78,205,196,0.15)',
-                    border: '1px solid rgba(78,205,196,0.4)',
-                    borderRadius: 8, padding: '4px 10px',
-                    fontSize: 11, color: 'var(--teal)', fontWeight: 600,
-                  }}>
-                    ✓ No Roteiro
-                  </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* ── Card content ─────────────────────────────────── */}
               <div style={{ flex: 1, padding: '16px 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
